@@ -20,7 +20,7 @@ It provides a modular structure for managing components (sensors, actuators, rel
 
 ## Architecture
 
-DeviceIQ Home is built on top of several dedicated libraries, all available in the [deviceiq-code GitHub organization](https://github.com/deviceiq-code):  
+DeviceIQ Home is built on top of several dedicated libraries, all available in the [deviceiq-code GitHub](https://github.com/deviceiq-code):  
 
 - **[DeviceIQ Lib Components](https://github.com/deviceiq-code/DeviceIQ-Lib-Components)** – Manages sensors, actuators, relays, buttons, PIRs, blinds, thermometers, and more  
 - **[DeviceIQ Lib Network](https://github.com/deviceiq-code/DeviceIQ-Lib-Network)** – Simplifies UDP/TCP communication between devices and orchestrators  
