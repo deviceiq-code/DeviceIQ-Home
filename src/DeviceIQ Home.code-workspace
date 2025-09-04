@@ -1,0 +1,46 @@
+{
+	"folders": [
+		{
+			"name": "DeviceIQ Home",
+			"path": ".."
+		},
+		{
+			"name": "DeviceIQ Lib Components",
+			"path": "../../../deviceiq-lib-components/DeviceIQ Lib Components"
+		},
+		{
+			"name": "DeviceIQ Lib Configuration",
+			"path": "../../../deviceiq-lib-configuration/DeviceIQ Lib Configuration"
+		},
+		{
+			"name": "DeviceIQ Lib FileSystem",
+			"path": "../../../deviceiq-lib-filesystem/DeviceIQ Lib FileSystem"
+		},
+		{
+			"name": "DeviceIQ Lib Network",
+			"path": "../../../deviceiq-lib-network/DeviceIQ Lib Network"
+		},
+		{
+			"name": "DeviceIQ Lib MQTT",
+			"path": "../../../deviceiq-lib-mqtt/DeviceIQ Lib MQTT"
+		},
+		{
+			"name": "DeviceIQ Lib DateTime",
+			"path": "../../../deviceiq-lib-datetime/DeviceIQ Lib DateTime"
+		},
+		{
+			"name": "deviceiq-lib-telnetserver",
+			"path": "../../../deviceiq-lib-telnetserver"
+		},
+		{
+			"name": "DeviceIQ Lib Log",
+			"path": "../../../deviceiq-lib-log/DeviceIQ Lib Log"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"new": "cpp",
+			"initializer_list": "cpp"
+		}
+	}
+}

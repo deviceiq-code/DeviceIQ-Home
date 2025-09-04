@@ -1,0 +1,147 @@
+{
+    "Components": [
+        {
+            "Address": 14,
+            "Bus": "Onboard",
+            "Class": "Relay",
+            "Events": {
+            },
+            "Name": "OL1_Relay",
+            "State": true,
+            "Enabled": true
+        },
+        {
+            "Address": 27,
+            "Bus": "Onboard",
+            "Class": "Relay",
+            "Events": {
+            },
+            "Name": "OL2_Relay",
+            "State": true,
+            "Enabled": true
+        },
+        {
+            "Address": 26,
+            "AutoRefreshMs": 0,
+            "Bus": "Onboard",
+            "Class": "Thermometer",
+            "Events": {
+            },
+            "Name": "Office",
+            "Type": "DS18B20",
+            "Enabled": true
+        },
+        {
+            "Address": 25,
+            "AutoRefreshMs": 0,
+            "Bus": "Onboard",
+            "Class": "Thermometer",
+            "Events": {
+            },
+            "Name": "Rack",
+            "Type": "DS18B20",
+            "Enabled": true
+        },
+        {
+            "Address": 32,
+            "Bus": "Onboard",
+            "Class": "Relay",
+            "Events": {
+            },
+            "Name": "RK2_Relay",
+            "State": false,
+            "Enabled": true
+        },
+        {
+            "Address": 12,
+            "Bus": "Onboard",
+            "Class": "Button",
+            "Events": {
+                "Changed": "invert(OL1_Relay)"
+            },
+            "Name": "OL1_Button",
+            "Report": "EdgesOnly",
+            "Enabled": true
+        },
+        {
+            "Address": 13,
+            "Bus": "Onboard",
+            "Class": "Button",
+            "Events": {
+                "Changed": "invert(OL2_Relay)"
+            },
+            "Name": "OL2_Button",
+            "Report": "EdgesOnly",
+            "Enabled": true
+        }
+    ],
+    "General": {
+        "Device Name": "DeviceIQ",
+        "I2C Bus": false,
+        "NTP Server": "pool.ntp.org",
+        "NTP Update": true,
+        
+        "Schema": "1.0.0"
+    },
+    "Update": {
+        "Debug": false,
+        "Allow Insecure": true,
+        "Update Manifest": "https://server.dts-network.com:8081/update.json",
+        "Check Interval": 21600000,
+        "Auto Reboot": true
+    },
+    "Log": {
+        "Endpoint": 7,
+        "Level": 7,
+        "Syslog Port": 514,
+        "Syslog Server": "192.168.1.1"
+    },
+    "MQTT": {
+        "Broker": "192.168.1.251",
+        "Enabled": true,
+        "Password": "deviceiq",
+        "Port": 1883,
+        "User": "deviceiq"
+    },
+    "Network": {
+        "Connection Timeout": 15,
+        "DHCP Client": true,
+        "DNS Servers": [
+            "8.8.8.8",
+            "8.8.4.4"
+        ],
+        "Gateway": "192.168.1.250",
+        "Hostname": "DEVIQ-OFFICE",
+        "IP Address": "192.168.2.30",
+        "MAC Address": "3C:61:05:64:59:44",
+        "Netmask": "255.255.255.0",
+        "Online Checking": true,
+        "Online Checking Minutes": 1,
+        "Passphrase": "1921682GenesisIOT-2",
+        "SSID": "IOT-2"
+    },
+    "Orchestrator": {
+        "Assigned": true,
+        "Server ID": "ZCZ95YJJ693UF78"
+    },
+    "Security": {
+        "Security Level": 7,
+        "Users": [
+            {
+                "Admin": true,
+                "Name": "admin",
+                "Password": "admin"
+            },
+            {
+                "Admin": false,
+                "Name": "user",
+                "Password": "user"
+            }
+        ]
+    },
+    "Webhooks": {
+        "Enabled": true,
+        "Port": 80,
+        "Token": "token_test"
+    }
+}
