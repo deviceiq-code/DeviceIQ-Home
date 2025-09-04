@@ -29,6 +29,7 @@ DeviceIQ Home is built on top of several dedicated libraries, all available in t
 - **[DeviceIQ Lib Configuration](https://github.com/deviceiq-code/DeviceIQ-Lib-Configuration)** – Lightweight configuration management library designed for embedded systems based on ESP32/ESP8266
 - **[DeviceIQ Lib MQTT](https://github.com/deviceiq-code/DeviceIQ-Lib-Configuration)** – MQTT client library designed for ESP32/ESP8266 projects
 - **[DeviceIQ Lib FileSystem](https://github.com/deviceiq-code/DeviceIQ-Lib-FileSystem)** – file system utility library for Arduino/ESP32 projects using LittleFS
+- **[DeviceIQ Lib Updater](https://github.com/deviceiq-code/DeviceIQ-Lib-Updater)** – OTA Update client
 
 ---
 
