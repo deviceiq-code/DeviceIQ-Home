@@ -22,11 +22,13 @@ It provides a modular structure for managing components (sensors, actuators, rel
 
 DeviceIQ Home is built on top of several dedicated libraries, all available in the [deviceiq-code GitHub organization](https://github.com/deviceiq-code):  
 
-- **[DeviceIQ Lib Core](https://github.com/deviceiq-code/DeviceIQ-Lib-Core)** – Base utilities and shared definitions  
 - **[DeviceIQ Lib Components](https://github.com/deviceiq-code/DeviceIQ-Lib-Components)** – Manages sensors, actuators, relays, buttons, PIRs, blinds, thermometers, and more  
 - **[DeviceIQ Lib Network](https://github.com/deviceiq-code/DeviceIQ-Lib-Network)** – Simplifies UDP/TCP communication between devices and orchestrators  
-- **[DeviceIQ Lib Orchestrator](https://github.com/deviceiq-code/DeviceIQ-Lib-Orchestrator)** – Coordinates devices, handles remote actions, pulls/pushes configs  
-- **[DeviceIQ Lib Automation](https://github.com/deviceiq-code/DeviceIQ-Lib-Automation)** – Lightweight scripting engine for triggers & actions  
+- **[DeviceIQ Lib DateTime](https://github.com/deviceiq-code/DeviceIQ-Lib-DateTime)** – It provides easy manipulation, formatting, and NTP synchronization without holding persistent NTP client objects in memory  
+- **[DeviceIQ Lib Log](https://github.com/deviceiq-code/DeviceIQ-Lib-Log)** – Record messages with different severity levels and send them to multiple endpoints such as the serial port, a Syslog server via UDP, and files stored in LittleFS  
+- **[DeviceIQ Lib Configuration](https://github.com/deviceiq-code/DeviceIQ-Lib-Configuration)** – Lightweight configuration management library designed for embedded systems based on ESP32/ESP8266
+- **[DeviceIQ Lib MQTT](https://github.com/deviceiq-code/DeviceIQ-Lib-Configuration)** – MQTT client library designed for ESP32/ESP8266 projects
+- **[DeviceIQ Lib FileSystem](https://github.com/deviceiq-code/DeviceIQ-Lib-FileSystem)** – file system utility library for Arduino/ESP32 projects using LittleFS
 
 ---
 
