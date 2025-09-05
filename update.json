@@ -1,7 +1,7 @@
 {
   "Model": "ESP32-Pro",
-  "Version": "1.0.0",
-  "Min Version": "1.0.0",
-  "URL": "http://server.dts-network.com:8082/bin/deviceiq-home-1.0.0.bin",
-  "SHA256": "33647618f5db6d746af792d710efc23492f98cceb150f1b3ba108702e86fca05"
+  "Version": "1.0.1",
+  "Min Version": "1.0.1",
+  "URL": "http://server.dts-network.com:8082/bin/deviceiq-home-1.0.1.bin",
+  "SHA256": "74f03ea68e0b20be2acb3fb12757e67b6cb68b585cfeede5abf85669217a5294"
 }

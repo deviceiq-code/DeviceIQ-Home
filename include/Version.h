@@ -11,7 +11,7 @@ static struct version {
     struct software {
         const uint8_t Major = 1;
         const uint8_t Minor = 0;
-        const uint8_t Revision = 0;
+        const uint8_t Revision = 1;
         inline String Info() { return String(Major) + "." + String(Minor) + "." + String(Revision); }
     } Software;
     struct hardware {
