@@ -198,7 +198,7 @@ void setup() {
 
                 auto* n = NewComponent->as<Button>();
                 if (n->ReportMode() == ButtonReportModes::BUTTONREPORTMODE_CLICKSONLY) {
-                    n->Event["Clicked"]([n, objs] {
+                    n->Event["Click ed"]([n, objs] {
                         if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Button:" + n->Name(), "Clicked");
                     });
                     n->Event["DoubleClicked"]([n, objs] {
@@ -279,8 +279,11 @@ void setup() {
                 NewComponent = new ContactSensor(devConfiguration->Setting["Components"][objs]["Name"].as<String>(), objs, NewComponent_Bus, NewComponent_BusAddress, devConfiguration->Setting["Components"][objs]["InvertClose"].as<bool>());
 
                 auto* n = NewComponent->as<ContactSensor>();
-                n->Event["Changed"]([n, objs] {
-                    if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/ContactSensor:" + n->Name(), n->IsClosed() ? "Closed" : "Open");
+                n->Event["Opened"]([n, objs] {
+                    if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/ContactSensor:" + n->Name(), "Opened");
+                });
+                n->Event["Closed"]([n, objs] {
+                    if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/ContactSensor:" + n->Name(), "Closed");
                 });
             } break;
 

@@ -4,75 +4,68 @@
             "Address": 14,
             "Bus": "Onboard",
             "Class": "Relay",
-            "Events": {
-            },
+            "Enabled": true,
+            "Events": {},
             "Name": "OL1_Relay",
-            "State": true,
-            "Enabled": true
+            "State": true
         },
         {
             "Address": 27,
             "Bus": "Onboard",
             "Class": "Relay",
-            "Events": {
-            },
+            "Enabled": true,
+            "Events": {},
             "Name": "OL2_Relay",
-            "State": true,
-            "Enabled": true
+            "State": true
         },
         {
             "Address": 26,
-            "AutoRefreshMs": 0,
             "Bus": "Onboard",
             "Class": "Thermometer",
-            "Events": {
-            },
+            "Enabled": true,
+            "Events": {},
             "Name": "Office",
-            "Type": "DS18B20",
-            "Enabled": true
+            "Type": "DS18B20"
         },
         {
             "Address": 25,
-            "AutoRefreshMs": 0,
             "Bus": "Onboard",
             "Class": "Thermometer",
-            "Events": {
-            },
+            "Enabled": true,
+            "Events": {},
             "Name": "Rack",
-            "Type": "DS18B20",
-            "Enabled": true
+            "Type": "DS18B20"
         },
         {
             "Address": 32,
             "Bus": "Onboard",
             "Class": "Relay",
-            "Events": {
-            },
+            "Enabled": true,
+            "Events": {},
             "Name": "RK2_Relay",
-            "State": false,
-            "Enabled": true
+            "State": false
         },
         {
             "Address": 12,
             "Bus": "Onboard",
             "Class": "Button",
+            "Enabled": true,
             "Events": {
                 "Changed": "invert(OL1_Relay)"
             },
             "Name": "OL1_Button",
-            "Report": "EdgesOnly",
-            "Enabled": true
+            "Report": "EdgesOnly"
         },
         {
             "Address": 13,
             "Bus": "Onboard",
             "Class": "Button",
+            "Enabled": true,
             "Events": {
                 "Changed": "invert(OL2_Relay)"
             },
             "Name": "OL2_Button",
-            "Report": "EdgesOnly",
-            "Enabled": true
+            "Report": "EdgesOnly"
         }
     ],
     "General": {
@@ -80,21 +73,20 @@
         "I2C Bus": false,
         "NTP Server": "pool.ntp.org",
         "NTP Update": true,
-        
         "Schema": "1.0.0"
     },
     "Update": {
         "Debug": false,
         "Allow Insecure": true,
-        "Update Manifest": "https://server.dts-network.com:8081/update.json",
-        "Check Interval": 21600000,
+        "Update Manifest": "https://server.dts-networ.com:8081/update.json",
+        "Check Interval": 172800000,
         "Auto Reboot": true
     },
     "Log": {
         "Endpoint": 7,
         "Level": 7,
         "Syslog Port": 514,
-        "Syslog Server": "192.168.1.1"
+        "Syslog Server": "192.168.1.251"
     },
     "MQTT": {
         "Broker": "192.168.1.251",
@@ -107,8 +99,8 @@
         "Connection Timeout": 15,
         "DHCP Client": true,
         "DNS Servers": [
-            "8.8.8.8",
-            "8.8.4.4"
+            "192.168.1.251",
+            "192.168.1.250"
         ],
         "Gateway": "192.168.1.250",
         "Hostname": "DEVIQ-OFFICE",
