@@ -20,6 +20,9 @@ enum DiscoveryMode { DISCOVERY_NONE, DISCOVERY_ALL, DISCOVERY_UNMANAGED, DISCOVE
 
 class ClientManager {
 public:
+    const String mManagerName = "Orchestrator";
+    const String mManagerVersion = "1.0.0";
+
     static ClientManager& getInstance();
 
     void begin();  // call in setup()
@@ -40,6 +43,9 @@ private:
     void handlePush(const JsonVariantConst& cmd, IPAddress remoteIp);
 
     bool connectAndExchangeJson(IPAddress remoteIp, uint16_t port, std::function<void(WiFiClient&)> exchange);
+
+    const String &NamagerName() const { return mManagerName; }
+    const String &NamagerVersion() const { return mManagerVersion; }
 
     AsyncUDP udp;
 };

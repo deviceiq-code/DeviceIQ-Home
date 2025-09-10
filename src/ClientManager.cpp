@@ -22,7 +22,7 @@ void ClientManager::handleUdpPacket(AsyncUDPPacket& packet) {
         return;
     }
 
-    String request = doc["Request"] | "";
+    String request = doc["Command"] | "";
     IPAddress senderIp = packet.remoteIP();
     
     if (request == "Discover") { handleDiscover(doc, senderIp); }
@@ -36,8 +36,8 @@ void ClientManager::handleUdpPacket(AsyncUDPPacket& packet) {
 }
 
 void ClientManager::handleDiscover(const JsonVariantConst& cmd, IPAddress remoteIp) {
-    String calling = cmd["Calling"] | "";
-    uint16_t replyPort = cmd["Reply Port"] | 30030;
+    String calling = cmd["Parameter"] | "";
+    uint16_t replyPort = 30030;
 
     bool assigned = devConfiguration->Setting["Orchestrator"]["Assigned"].as<bool>();
     DiscoveryMode mode = DISCOVERY_NONE;
@@ -49,16 +49,16 @@ void ClientManager::handleDiscover(const JsonVariantConst& cmd, IPAddress remote
     if (mode == DISCOVERY_NONE) return;
 
     connectAndExchangeJson(remoteIp, replyPort, [&](WiFiClient& client) {
-        DynamicJsonDocument reply(1024);
-        reply["Orchestrator"]["Server"] = remoteIp.toString();
-        reply["Orchestrator"]["Port"] = replyPort;
-        reply["DeviceIQ"]["Product Name"] = Version.ProductName;
-        reply["DeviceIQ"]["Hardware Model"] = Version.Hardware.Model;
-        reply["DeviceIQ"]["Device Name"] = devConfiguration->Setting["General"]["Device Name"].as<String>();
-        reply["DeviceIQ"]["Version"] = Version.Software.Info();
-        reply["DeviceIQ"]["Hostname"] = devNetwork->Hostname();
-        reply["DeviceIQ"]["MAC Address"] = devNetwork->MAC_Address();
-        reply["DeviceIQ"]["IP Address"] = devNetwork->IP_Address();
+        JsonDocument reply;
+        reply["Provider"] = mManagerName;
+        reply["Command"] = "Discover";
+        reply["Parameter"]["Server ID"] = devConfiguration->Setting["Orchestrator"]["Server ID"].as<String>();
+        reply["Parameter"]["Product Name"] = Version.ProductName;
+        reply["Parameter"]["Hardware Model"] = Version.Hardware.Model;
+        reply["Parameter"]["Version"] = Version.Software.Info();
+        reply["Parameter"]["Hostname"] = devNetwork->Hostname();
+        reply["Parameter"]["MAC Address"] = devNetwork->MAC_Address();
+        reply["Parameter"]["IP Address"] = devNetwork->IP_Address();
 
         String json;
         serializeJson(reply, json);

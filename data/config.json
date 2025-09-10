@@ -69,11 +69,9 @@
         }
     ],
     "General": {
-        "Device Name": "DeviceIQ",
         "I2C Bus": false,
         "NTP Server": "pool.ntp.org",
-        "NTP Update": true,
-        "Schema": "1.0.0"
+        "NTP Update": true
     },
     "Update": {
         "Debug": false,
@@ -103,14 +101,14 @@
             "192.168.1.250"
         ],
         "Gateway": "192.168.1.250",
-        "Hostname": "DEVIQ-OFFICE2",
+        "Hostname": "DEVIQ-OFFICE3",
         "IP Address": "192.168.2.30",
         "MAC Address": "3C:61:05:64:59:44",
         "Netmask": "255.255.255.0",
         "Online Checking": true,
         "Online Checking Minutes": 1,
-        "Passphrase": "1921682GenesisIOT-2",
-        "SSID": "IOT-2"
+        "Passphrase": "!VzML$k549Gnsy3",
+        "SSID": "Genesis"
     },
     "Orchestrator": {
         "Assigned": true,

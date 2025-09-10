@@ -7,7 +7,7 @@
 
 static struct version {
     const String ProductFamily = "DeviceIQ";
-    const String ProductName = "ESP32-Pro";
+    const String ProductName = "Home";
     struct software {
         const uint8_t Major = 1;
         const uint8_t Minor = 0;
@@ -15,7 +15,7 @@ static struct version {
         inline String Info() { return String(Major) + "." + String(Minor) + "." + String(Revision); }
     } Software;
     struct hardware {
-        const String Model = "ESP-32";
+        const String Model = "ESP32-WROOM";
         const uint8_t Major = 1;
         const uint8_t Minor = 3;
         const uint8_t Revision = 2;
