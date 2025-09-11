@@ -69,7 +69,20 @@ void ClientManager::handleDiscover(const JsonVariantConst& cmd, IPAddress remote
 }
 
 void ClientManager::handleRestart(const JsonVariantConst& cmd, IPAddress remoteIp) {
-    devLog->Write("Orchestrator: Received Restart command", LOGLEVEL_INFO);
+    uint16_t replyPort = 30030;
+
+    connectAndExchangeJson(remoteIp, replyPort, [&](WiFiClient& client) {
+        JsonDocument reply;
+        reply["Provider"] = mManagerName;
+        reply["Command"] = "Restart";
+        reply["Parameter"] = "Ok";
+
+        String json;
+        serializeJson(reply, json);
+        client.print(json);
+    });
+
+    devLog->Write("Orchestrator: Replied Restart command to " + remoteIp.toString(), LOGLEVEL_INFO);
     
     esp_sleep_enable_timer_wakeup(200 * 1000);
     esp_deep_sleep_start();
