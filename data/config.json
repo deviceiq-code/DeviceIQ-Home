@@ -94,25 +94,27 @@
         "User": "deviceiq"
     },
     "Network": {
-        "Connection Timeout": 15,
+        "Connection Timeout": 30,
         "DHCP Client": true,
         "DNS Servers": [
             "192.168.1.251",
             "192.168.1.250"
         ],
         "Gateway": "192.168.1.250",
-        "Hostname": "DEVIQ-OFFICE3",
+        "Hostname": "DEVIQ-LAB",
         "IP Address": "192.168.2.30",
         "MAC Address": "3C:61:05:64:59:44",
         "Netmask": "255.255.255.0",
         "Online Checking": true,
         "Online Checking Minutes": 1,
-        "Passphrase": "!VzML$k549Gnsy3",
-        "SSID": "Genesis"
+        "Passphrase": "1921682GenesisIOT-2",
+        "SSID": "IOT-2"
     },
     "Orchestrator": {
         "Assigned": true,
-        "Server ID": "ZCZ95YJJ693UF78"
+        "Server ID": "ZCZ95YJJ693UF78",
+        "IP Address": "192.168.2.144",
+        "Port": 30030
     },
     "Security": {
         "Security Level": 7,

@@ -6,6 +6,7 @@ extern Configuration* devConfiguration;
 extern Log* devLog;
 extern FileSystem* devFileSystem;
 extern Network* devNetwork;
+extern Clock *devClock;
 extern bool g_cmdCheckNow;
 
 ClientManager& ClientManager::getInstance() { static ClientManager instance; return instance; }
@@ -35,6 +36,38 @@ void ClientManager::handleUdpPacket(AsyncUDPPacket& packet) {
     else { devLog->Write("Orchestrator: Unknown request [" + request + "]", LOGLEVEL_WARNING); }
 }
 
+bool ClientManager::UpdateOrchestrator() {
+    IPAddress serverip;
+    uint16_t serverport = devConfiguration->Setting["Orchestrator"]["Port"].as<uint16_t>();
+
+    if (serverip.fromString(devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>())) {
+        connectAndExchangeJson(serverip, serverport, [&](WiFiClient& client) {
+            JsonDocument reply;
+            reply["Provider"] = mManagerName;
+            reply["Command"] = "Discover";
+            reply["Parameter"]["Server ID"] = devConfiguration->Setting["Orchestrator"]["Server ID"].as<String>();
+            reply["Parameter"]["Product Name"] = Version.ProductName;
+            reply["Parameter"]["Hardware Model"] = Version.Hardware.Model;
+            reply["Parameter"]["Version"] = Version.Software.Info();
+            reply["Parameter"]["Hostname"] = devNetwork->Hostname();
+            reply["Parameter"]["MAC Address"] = devNetwork->MAC_Address();
+            reply["Parameter"]["IP Address"] = devNetwork->IP_Address();
+            reply["Parameter"]["Local Timestamp"] = devClock->CurrentDateTime();
+
+            String json;
+            serializeJson(reply, json);
+            client.print(json);
+
+            devLog->Write("Orchestrator: Sent updated device info to " + serverip.toString() + ":" + String(serverport), LOGLEVEL_INFO);
+        });
+    } else {
+        devLog->Write("Orchestrator: Error sending updated device info to " + devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>()+ ":" + String(serverport), LOGLEVEL_ERROR);
+        return false;
+    }
+
+    return true;
+}
+
 void ClientManager::handleDiscover(const JsonVariantConst& cmd, IPAddress remoteIp) {
     String calling = cmd["Parameter"] | "";
     uint16_t replyPort = 30030;
@@ -59,6 +92,7 @@ void ClientManager::handleDiscover(const JsonVariantConst& cmd, IPAddress remote
         reply["Parameter"]["Hostname"] = devNetwork->Hostname();
         reply["Parameter"]["MAC Address"] = devNetwork->MAC_Address();
         reply["Parameter"]["IP Address"] = devNetwork->IP_Address();
+        reply["Parameter"]["Local Timestamp"] = devClock->CurrentDateTime();
 
         String json;
         serializeJson(reply, json);
@@ -75,7 +109,8 @@ void ClientManager::handleRestart(const JsonVariantConst& cmd, IPAddress remoteI
         JsonDocument reply;
         reply["Provider"] = mManagerName;
         reply["Command"] = "Restart";
-        reply["Parameter"] = "Ok";
+        reply["Parameter"] = "ACK";
+        reply["Hostname"] = devNetwork->Hostname();
 
         String json;
         serializeJson(reply, json);
