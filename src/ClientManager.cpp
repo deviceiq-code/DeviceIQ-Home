@@ -27,46 +27,14 @@ void ClientManager::handleUdpPacket(AsyncUDPPacket& packet) {
     IPAddress senderIp = packet.remoteIP();
     
     if (request == "Discover") { handleDiscover(doc, senderIp); }
-    else if (request == "Restart") { handleRestart(doc, senderIp); }
-    else if (request == "Refresh") { handleRefresh(doc, senderIp); }
+    else if (request == "Restart") { Restart(); }
+    else if (request == "Refresh") { Refresh(); }
     else if (request == "Add") { handleAdd(doc, senderIp); }
     else if (request == "Remove") { handleRemove(doc, senderIp); }
     else if (request == "Update") { handleUpdate(doc, senderIp); }
-    else if (request == "Pull") { handlePull(doc, senderIp); }
+    else if (request == "Pull") { Pull(doc); }
     else if (request == "Push") { handlePush(doc, senderIp); }
     else { devLog->Write("Orchestrator: Unknown request [" + request + "]", LOGLEVEL_WARNING); }
-}
-
-bool ClientManager::UpdateOrchestrator() {
-    IPAddress serverip;
-    uint16_t serverport = devConfiguration->Setting["Orchestrator"]["Port"].as<uint16_t>();
-
-    if (serverip.fromString(devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>())) {
-        connectAndExchangeJson(serverip, serverport, [&](WiFiClient& client) {
-            JsonDocument reply;
-            reply["Provider"] = mManagerName;
-            reply["Command"] = "Discover";
-            reply["Parameter"]["Server ID"] = devConfiguration->Setting["Orchestrator"]["Server ID"].as<String>();
-            reply["Parameter"]["Product Name"] = Version.ProductName;
-            reply["Parameter"]["Hardware Model"] = Version.Hardware.Model;
-            reply["Parameter"]["Version"] = Version.Software.Info();
-            reply["Parameter"]["Hostname"] = devNetwork->Hostname();
-            reply["Parameter"]["MAC Address"] = devNetwork->MAC_Address();
-            reply["Parameter"]["IP Address"] = devNetwork->IP_Address();
-            reply["Parameter"]["Local Timestamp"] = devClock->CurrentDateTime();
-
-            String json;
-            serializeJson(reply, json);
-            client.print(json);
-
-            devLog->Write("Orchestrator: Sent updated device info to " + serverip.toString() + ":" + String(serverport), LOGLEVEL_INFO);
-        });
-    } else {
-        devLog->Write("Orchestrator: Error sending updated device info to " + devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>()+ ":" + String(serverport), LOGLEVEL_ERROR);
-        return false;
-    }
-
-    return true;
 }
 
 void ClientManager::handleDiscover(const JsonVariantConst& cmd, IPAddress remoteIp) {
@@ -103,29 +71,102 @@ void ClientManager::handleDiscover(const JsonVariantConst& cmd, IPAddress remote
     devLog->Write("Orchestrator: Replied discovery call to " + remoteIp.toString(), LOGLEVEL_INFO);
 }
 
-void ClientManager::handleRestart(const JsonVariantConst& cmd, IPAddress remoteIp) {
-    uint16_t replyPort = 30030;
+bool ClientManager::Restart() {
+    IPAddress serverip;
+    uint16_t serverport = devConfiguration->Setting["Orchestrator"]["Port"].as<uint16_t>();
 
-    connectAndExchangeJson(remoteIp, replyPort, [&](WiFiClient& client) {
-        JsonDocument reply;
-        reply["Provider"] = mManagerName;
-        reply["Command"] = "Restart";
-        reply["Parameter"] = "ACK";
-        reply["Hostname"] = devNetwork->Hostname();
+    if (serverip.fromString(devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>())) {
+        connectAndExchangeJson(serverip, serverport, [&](WiFiClient& client) {
+            JsonDocument reply;
+            reply["Provider"] = mManagerName;
+            reply["Command"] = "Restart";
+            reply["Parameter"] = "ACK";
+            reply["Hostname"] = devNetwork->Hostname();
 
-        String json;
-        serializeJson(reply, json);
-        client.print(json);
-    });
+            String json;
+            serializeJson(reply, json);
+            client.print(json);
 
-    devLog->Write("Orchestrator: Replied Restart command to " + remoteIp.toString(), LOGLEVEL_INFO);
+            devLog->Write("Orchestrator: Replied Restart command to " + serverip.toString(), LOGLEVEL_INFO);
+        });
+    } else {
+        devLog->Write("Orchestrator: Error sending ACK to " + devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>()+ ":" + String(serverport), LOGLEVEL_ERROR);
+        return false;
+    }
+
+    devLog->Write("Orchestrator: Replied Restart command to " + serverip.toString() + ":" + String(serverport), LOGLEVEL_INFO);
     
     esp_sleep_enable_timer_wakeup(200 * 1000);
     esp_deep_sleep_start();
+
+    return true;
 }
 
-void ClientManager::handleRefresh(const JsonVariantConst& cmd, IPAddress remoteIp) {
-    UpdateOrchestrator();
+bool ClientManager::Refresh() {
+    IPAddress serverip;
+    uint16_t serverport = devConfiguration->Setting["Orchestrator"]["Port"].as<uint16_t>();
+
+    if (serverip.fromString(devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>())) {
+        connectAndExchangeJson(serverip, serverport, [&](WiFiClient& client) {
+            JsonDocument reply;
+            reply["Provider"] = mManagerName;
+            reply["Command"] = "Discover";
+            reply["Parameter"]["Server ID"] = devConfiguration->Setting["Orchestrator"]["Server ID"].as<String>();
+            reply["Parameter"]["Product Name"] = Version.ProductName;
+            reply["Parameter"]["Hardware Model"] = Version.Hardware.Model;
+            reply["Parameter"]["Version"] = Version.Software.Info();
+            reply["Parameter"]["Hostname"] = devNetwork->Hostname();
+            reply["Parameter"]["MAC Address"] = devNetwork->MAC_Address();
+            reply["Parameter"]["IP Address"] = devNetwork->IP_Address();
+            reply["Parameter"]["Local Timestamp"] = devClock->CurrentDateTime();
+
+            String json;
+            serializeJson(reply, json);
+            client.print(json);
+
+            devLog->Write("Orchestrator: Sent updated device info to " + serverip.toString() + ":" + String(serverport), LOGLEVEL_INFO);
+        });
+    } else {
+        devLog->Write("Orchestrator: Error sending updated device info to " + devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>()+ ":" + String(serverport), LOGLEVEL_ERROR);
+        return false;
+    }
+
+    return true;
+}
+
+bool ClientManager::Pull(const JsonVariantConst& cmd) {
+    if (!devConfiguration->Setting["Orchestrator"]["Assigned"].as<bool>()) {
+        devLog->Write("Orchestrator: Ignoring Pull command - Device is not assigned", LOGLEVEL_WARNING);
+        return false;
+    }
+
+    if (cmd["Server ID"] != devConfiguration->Setting["Orchestrator"]["Server ID"].as<String>()) {
+        devLog->Write("Orchestrator: Ignoring Pull command - Server ID mismatch", LOGLEVEL_WARNING);
+        return false;
+    }
+
+    IPAddress serverip;
+    uint16_t serverport = devConfiguration->Setting["Orchestrator"]["Port"].as<uint16_t>();
+
+    if (serverip.fromString(devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>())) {
+        connectAndExchangeJson(serverip, serverport, [&](WiFiClient& client) {
+            JsonDocument reply;
+            reply["Provider"] = mManagerName;
+            reply["Command"] = "Pull";
+            reply["Parameter"].set(devConfiguration->Setting);
+
+            String json;
+            serializeJson(reply, json);
+            client.print(json);
+
+            devLog->Write("Orchestrator: Sent device configuration file to " + serverip.toString() + ":" + String(serverport), LOGLEVEL_INFO);
+        });
+    } else {
+        devLog->Write("Orchestrator: Error sending configuration file to " + devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>()+ ":" + String(serverport), LOGLEVEL_ERROR);
+        return false;
+    }
+
+    return true;
 }
 
 void ClientManager::handleAdd(const JsonVariantConst& cmd, IPAddress remoteIp) {
@@ -215,6 +256,19 @@ void ClientManager::handleUpdate(const JsonVariantConst& cmd, IPAddress remoteIp
 }
 
 void ClientManager::handlePull(const JsonVariantConst& cmd, IPAddress remoteIp) {
+    // connectAndExchangeJson(remoteIp, port, [&](WiFiClient& client) {
+    //     devConfiguration->Setting["Network"]["MAC Address"] = devNetwork->MAC_Address();
+    //     String out;
+    //     serializeJson(devConfiguration->Setting, out);
+    //     client.print(out);
+    //     devLog->Write("Orchestrator: Sent config to " + remoteIp.toString() + ":" + String(port) + " (" + String(out.length()) + " bytes)", LOGLEVEL_INFO);
+    // });
+
+    String calling = cmd["Parameter"] | "";
+    uint16_t replyPort = 30030;
+
+    bool assigned = devConfiguration->Setting["Orchestrator"]["Assigned"].as<bool>();
+
     if (!devConfiguration->Setting["Orchestrator"]["Assigned"].as<bool>()) {
         devLog->Write("Orchestrator: Ignoring Pull command - Device is not assigned", LOGLEVEL_WARNING);
         return;
@@ -225,19 +279,18 @@ void ClientManager::handlePull(const JsonVariantConst& cmd, IPAddress remoteIp) 
         return;
     }
 
-    if (cmd["MAC Address"] != devNetwork->MAC_Address()) {
-        devLog->Write("Orchestrator: Ignoring Pull command - MAC Address mismatch", LOGLEVEL_WARNING);
-        return;
-    }
-
-    uint16_t port = cmd["Reply Port"] | 30030;
-    connectAndExchangeJson(remoteIp, port, [&](WiFiClient& client) {
-        devConfiguration->Setting["Network"]["MAC Address"] = devNetwork->MAC_Address();
-        String out;
-        serializeJson(devConfiguration->Setting, out);
-        client.print(out);
-        devLog->Write("Orchestrator: Sent config to " + remoteIp.toString() + ":" + String(port) + " (" + String(out.length()) + " bytes)", LOGLEVEL_INFO);
+    connectAndExchangeJson(remoteIp, replyPort, [&](WiFiClient& client) {
+        JsonDocument reply;
+        reply["Provider"] = mManagerName;
+        reply["Command"] = "Pull";
+        reply["Parameter"] = devConfiguration->Setting;
+        
+        String json;
+        serializeJson(reply, json);
+        client.print(json);
     });
+
+    devLog->Write("Orchestrator: Replied pull call to " + remoteIp.toString(), LOGLEVEL_INFO);
 }
 
 void ClientManager::handlePush(const JsonVariantConst& cmd, IPAddress remoteIp) {
@@ -315,7 +368,7 @@ void ClientManager::handlePush(const JsonVariantConst& cmd, IPAddress remoteIp) 
 
     devFileSystem->DeleteFile("/tmp_config.json");
 
-    if (cmd["Apply"].as<bool>()) handleRestart(cmd, remoteIp);
+    if (cmd["Apply"].as<bool>()) Restart();
 }
 
 bool ClientManager::connectAndExchangeJson(IPAddress remoteIp, uint16_t port, std::function<void(WiFiClient&)> exchange) {

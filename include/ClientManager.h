@@ -29,7 +29,9 @@ class ClientManager {
 
         void begin();  // call in setup()
 
-        bool UpdateOrchestrator();
+        bool Restart();
+        bool Refresh();
+        bool Pull(const JsonVariantConst& cmd);
 
     private:
         ClientManager() = default;                  // private ctor for singleton
@@ -39,8 +41,6 @@ class ClientManager {
         void handleUdpPacket(AsyncUDPPacket& packet);
 
         void handleDiscover(const JsonVariantConst& cmd, IPAddress remoteIp);
-        void handleRestart(const JsonVariantConst& cmd, IPAddress remoteIp);
-        void handleRefresh(const JsonVariantConst& cmd, IPAddress remoteIp);
         void handleAdd(const JsonVariantConst& cmd, IPAddress remoteIp);
         void handleRemove(const JsonVariantConst& cmd, IPAddress remoteIp);
         void handleUpdate(const JsonVariantConst& cmd, IPAddress remoteIp);
