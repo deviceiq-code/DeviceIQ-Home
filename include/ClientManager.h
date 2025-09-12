@@ -40,6 +40,7 @@ class ClientManager {
 
         void handleDiscover(const JsonVariantConst& cmd, IPAddress remoteIp);
         void handleRestart(const JsonVariantConst& cmd, IPAddress remoteIp);
+        void handleRefresh(const JsonVariantConst& cmd, IPAddress remoteIp);
         void handleAdd(const JsonVariantConst& cmd, IPAddress remoteIp);
         void handleRemove(const JsonVariantConst& cmd, IPAddress remoteIp);
         void handleUpdate(const JsonVariantConst& cmd, IPAddress remoteIp);

@@ -28,6 +28,7 @@ void ClientManager::handleUdpPacket(AsyncUDPPacket& packet) {
     
     if (request == "Discover") { handleDiscover(doc, senderIp); }
     else if (request == "Restart") { handleRestart(doc, senderIp); }
+    else if (request == "Refresh") { handleRefresh(doc, senderIp); }
     else if (request == "Add") { handleAdd(doc, senderIp); }
     else if (request == "Remove") { handleRemove(doc, senderIp); }
     else if (request == "Update") { handleUpdate(doc, senderIp); }
@@ -121,6 +122,10 @@ void ClientManager::handleRestart(const JsonVariantConst& cmd, IPAddress remoteI
     
     esp_sleep_enable_timer_wakeup(200 * 1000);
     esp_deep_sleep_start();
+}
+
+void ClientManager::handleRefresh(const JsonVariantConst& cmd, IPAddress remoteIp) {
+    UpdateOrchestrator();
 }
 
 void ClientManager::handleAdd(const JsonVariantConst& cmd, IPAddress remoteIp) {
