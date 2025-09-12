@@ -29,8 +29,8 @@ class ClientManager {
 
         void begin();  // call in setup()
 
-        bool Restart();
-        bool Refresh();
+        bool Restart(const JsonVariantConst& cmd);
+        bool Refresh(const JsonVariantConst& cmd);
         bool Pull(const JsonVariantConst& cmd);
 
     private:
@@ -48,6 +48,8 @@ class ClientManager {
         void handlePush(const JsonVariantConst& cmd, IPAddress remoteIp);
 
         bool connectAndExchangeJson(IPAddress remoteIp, uint16_t port, std::function<void(WiFiClient&)> exchange);
+        
+        bool CheckOrchestratorAssignedAndServerID(const JsonObjectConst &cmd);
 
         const String &NamagerName() const { return mManagerName; }
         const String &NamagerVersion() const { return mManagerVersion; }

@@ -423,7 +423,10 @@ void setup() {
                 if (devConfiguration->Setting["Orchestrator"]["Assigned"].as<bool>()) {
                     devLog->Write("Orchestrator: Device assigned to server ID " + devConfiguration->Setting["Orchestrator"]["Server ID"].as<String>(), LOGLEVEL_WARNING);
 
-                    ClientManager::getInstance().Refresh();
+                    JsonDocument cmd;
+                    cmd["Server ID"] = devConfiguration->Setting["Orchestrator"]["Server ID"];
+                    
+                    ClientManager::getInstance().Refresh(cmd);
                 } else {
                     devLog->Write("Orchestrator: Device is not assigned to an Orchestrator server", LOGLEVEL_WARNING);
                 }

@@ -17,7 +17,7 @@ void ClientManager::begin() {
 }
 
 void ClientManager::handleUdpPacket(AsyncUDPPacket& packet) {
-    StaticJsonDocument<1024> doc;
+    JsonDocument doc;
     if (deserializeJson(doc, packet.data(), packet.length()) != DeserializationError::Ok) {
         devLog->Write("Orchestrator: Invalid JSON received over UDP", LOGLEVEL_WARNING);
         return;
@@ -27,8 +27,8 @@ void ClientManager::handleUdpPacket(AsyncUDPPacket& packet) {
     IPAddress senderIp = packet.remoteIP();
     
     if (request == "Discover") { handleDiscover(doc, senderIp); }
-    else if (request == "Restart") { Restart(); }
-    else if (request == "Refresh") { Refresh(); }
+    else if (request == "Restart") { Restart(doc); }
+    else if (request == "Refresh") { Refresh(doc); }
     else if (request == "Add") { handleAdd(doc, senderIp); }
     else if (request == "Remove") { handleRemove(doc, senderIp); }
     else if (request == "Update") { handleUpdate(doc, senderIp); }
@@ -71,7 +71,12 @@ void ClientManager::handleDiscover(const JsonVariantConst& cmd, IPAddress remote
     devLog->Write("Orchestrator: Replied discovery call to " + remoteIp.toString(), LOGLEVEL_INFO);
 }
 
-bool ClientManager::Restart() {
+bool ClientManager::Restart(const JsonVariantConst& cmd) {
+    if (devConfiguration->Setting["Orchestrator"]["Assigned"].as<bool>() && cmd["Server ID"] != devConfiguration->Setting["Orchestrator"]["Server ID"].as<String>()) {
+        devLog->Write("Orchestrator: Ignoring Refresh command - Server ID mismatch", LOGLEVEL_WARNING);
+        return false;
+    }
+
     IPAddress serverip;
     uint16_t serverport = devConfiguration->Setting["Orchestrator"]["Port"].as<uint16_t>();
 
@@ -102,7 +107,26 @@ bool ClientManager::Restart() {
     return true;
 }
 
-bool ClientManager::Refresh() {
+bool ClientManager::CheckOrchestratorAssignedAndServerID(const JsonObjectConst &cmd) {
+    auto orchestrator = devConfiguration->Setting["Orchestrator"];
+
+    if (!orchestrator["Assigned"].is<bool>() || !orchestrator["Assigned"].as<bool>()) {
+        devLog->Write("Orchestrator: Ignoring command - Device is not assigned", LOGLEVEL_WARNING);
+        return false;
+    }
+
+    if (!orchestrator["Server ID"].is<const char*>() || cmd["Server ID"] != orchestrator["Server ID"].as<String>()) {
+        devLog->Write("Orchestrator: Ignoring command - Server ID mismatch", LOGLEVEL_WARNING);
+        return false;
+    }
+
+    return true;
+}
+
+
+bool ClientManager::Refresh(const JsonVariantConst& cmd) {
+    if (!CheckOrchestratorAssignedAndServerID(cmd)) return false;
+
     IPAddress serverip;
     uint16_t serverport = devConfiguration->Setting["Orchestrator"]["Port"].as<uint16_t>();
 
@@ -135,15 +159,7 @@ bool ClientManager::Refresh() {
 }
 
 bool ClientManager::Pull(const JsonVariantConst& cmd) {
-    if (!devConfiguration->Setting["Orchestrator"]["Assigned"].as<bool>()) {
-        devLog->Write("Orchestrator: Ignoring Pull command - Device is not assigned", LOGLEVEL_WARNING);
-        return false;
-    }
-
-    if (cmd["Server ID"] != devConfiguration->Setting["Orchestrator"]["Server ID"].as<String>()) {
-        devLog->Write("Orchestrator: Ignoring Pull command - Server ID mismatch", LOGLEVEL_WARNING);
-        return false;
-    }
+    if (!CheckOrchestratorAssignedAndServerID(cmd)) return false;
 
     IPAddress serverip;
     uint16_t serverport = devConfiguration->Setting["Orchestrator"]["Port"].as<uint16_t>();
@@ -368,7 +384,7 @@ void ClientManager::handlePush(const JsonVariantConst& cmd, IPAddress remoteIp) 
 
     devFileSystem->DeleteFile("/tmp_config.json");
 
-    if (cmd["Apply"].as<bool>()) Restart();
+    if (cmd["Apply"].as<bool>()) Restart(cmd);
 }
 
 bool ClientManager::connectAndExchangeJson(IPAddress remoteIp, uint16_t port, std::function<void(WiFiClient&)> exchange) {
