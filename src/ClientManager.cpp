@@ -26,7 +26,7 @@ void ClientManager::handleUdpPacket(AsyncUDPPacket& packet) {
     String request = doc["Command"] | "";
     IPAddress senderIp = packet.remoteIP();
     
-    if (request == "Discover") { handleDiscover(doc, senderIp); }
+    if (request == "Discover") { Discover(doc); }
     else if (request == "Restart") { Restart(doc); }
     else if (request == "Refresh") { Refresh(doc); }
     else if (request == "Add") { handleAdd(doc, senderIp); }
@@ -35,40 +35,6 @@ void ClientManager::handleUdpPacket(AsyncUDPPacket& packet) {
     else if (request == "Pull") { Pull(doc); }
     else if (request == "Push") { handlePush(doc, senderIp); }
     else { devLog->Write("Orchestrator: Unknown request [" + request + "]", LOGLEVEL_WARNING); }
-}
-
-void ClientManager::handleDiscover(const JsonVariantConst& cmd, IPAddress remoteIp) {
-    String calling = cmd["Parameter"] | "";
-    uint16_t replyPort = 30030;
-
-    bool assigned = devConfiguration->Setting["Orchestrator"]["Assigned"].as<bool>();
-    DiscoveryMode mode = DISCOVERY_NONE;
-
-    if (calling == "All") mode = DISCOVERY_ALL;
-    else if (calling == "Managed" && assigned) mode = DISCOVERY_MANAGED;
-    else if (calling == "Unmanaged" && !assigned) mode = DISCOVERY_UNMANAGED;
-
-    if (mode == DISCOVERY_NONE) return;
-
-    connectAndExchangeJson(remoteIp, replyPort, [&](WiFiClient& client) {
-        JsonDocument reply;
-        reply["Provider"] = mManagerName;
-        reply["Command"] = "Discover";
-        reply["Parameter"]["Server ID"] = devConfiguration->Setting["Orchestrator"]["Server ID"].as<String>();
-        reply["Parameter"]["Product Name"] = Version.ProductName;
-        reply["Parameter"]["Hardware Model"] = Version.Hardware.Model;
-        reply["Parameter"]["Version"] = Version.Software.Info();
-        reply["Parameter"]["Hostname"] = devNetwork->Hostname();
-        reply["Parameter"]["MAC Address"] = devNetwork->MAC_Address();
-        reply["Parameter"]["IP Address"] = devNetwork->IP_Address();
-        reply["Parameter"]["Local Timestamp"] = devClock->CurrentDateTime();
-
-        String json;
-        serializeJson(reply, json);
-        client.print(json);
-    });
-
-    devLog->Write("Orchestrator: Replied discovery call to " + remoteIp.toString(), LOGLEVEL_INFO);
 }
 
 bool ClientManager::Restart(const JsonVariantConst& cmd) {
@@ -123,12 +89,11 @@ bool ClientManager::CheckOrchestratorAssignedAndServerID(const JsonObjectConst &
     return true;
 }
 
-
-bool ClientManager::Refresh(const JsonVariantConst& cmd) {
-    if (!CheckOrchestratorAssignedAndServerID(cmd)) return false;
-
+bool ClientManager::Discover(const JsonVariantConst& cmd) {
     IPAddress serverip;
     uint16_t serverport = devConfiguration->Setting["Orchestrator"]["Port"].as<uint16_t>();
+
+    // TODO: discover the Orchestrator server IP address!!!
 
     if (serverip.fromString(devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>())) {
         connectAndExchangeJson(serverip, serverport, [&](WiFiClient& client) {
@@ -156,6 +121,12 @@ bool ClientManager::Refresh(const JsonVariantConst& cmd) {
     }
 
     return true;
+}
+
+bool ClientManager::Refresh(const JsonVariantConst& cmd) {
+    if (!CheckOrchestratorAssignedAndServerID(cmd)) return false;
+
+    return Discover(cmd);
 }
 
 bool ClientManager::Pull(const JsonVariantConst& cmd) {
@@ -269,44 +240,6 @@ void ClientManager::handleUpdate(const JsonVariantConst& cmd, IPAddress remoteIp
     
     devLog->Write("Orchestrator: Received Update command", LOGLEVEL_INFO);
     g_cmdCheckNow = true;
-}
-
-void ClientManager::handlePull(const JsonVariantConst& cmd, IPAddress remoteIp) {
-    // connectAndExchangeJson(remoteIp, port, [&](WiFiClient& client) {
-    //     devConfiguration->Setting["Network"]["MAC Address"] = devNetwork->MAC_Address();
-    //     String out;
-    //     serializeJson(devConfiguration->Setting, out);
-    //     client.print(out);
-    //     devLog->Write("Orchestrator: Sent config to " + remoteIp.toString() + ":" + String(port) + " (" + String(out.length()) + " bytes)", LOGLEVEL_INFO);
-    // });
-
-    String calling = cmd["Parameter"] | "";
-    uint16_t replyPort = 30030;
-
-    bool assigned = devConfiguration->Setting["Orchestrator"]["Assigned"].as<bool>();
-
-    if (!devConfiguration->Setting["Orchestrator"]["Assigned"].as<bool>()) {
-        devLog->Write("Orchestrator: Ignoring Pull command - Device is not assigned", LOGLEVEL_WARNING);
-        return;
-    }
-
-    if (cmd["Server ID"] != devConfiguration->Setting["Orchestrator"]["Server ID"].as<String>()) {
-        devLog->Write("Orchestrator: Ignoring Pull command - Server ID mismatch", LOGLEVEL_WARNING);
-        return;
-    }
-
-    connectAndExchangeJson(remoteIp, replyPort, [&](WiFiClient& client) {
-        JsonDocument reply;
-        reply["Provider"] = mManagerName;
-        reply["Command"] = "Pull";
-        reply["Parameter"] = devConfiguration->Setting;
-        
-        String json;
-        serializeJson(reply, json);
-        client.print(json);
-    });
-
-    devLog->Write("Orchestrator: Replied pull call to " + remoteIp.toString(), LOGLEVEL_INFO);
 }
 
 void ClientManager::handlePush(const JsonVariantConst& cmd, IPAddress remoteIp) {
