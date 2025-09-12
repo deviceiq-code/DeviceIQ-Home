@@ -321,8 +321,6 @@ void ClientManager::handlePush(const JsonVariantConst& cmd, IPAddress remoteIp) 
 bool ClientManager::connectAndExchangeJson(IPAddress remoteIp, uint16_t port, std::function<void(WiFiClient&)> exchange) {
     WiFiClient client;
 
-    delay(500);
-
     if (!client.connect(remoteIp, port)) {
         devLog->Write("Orchestrator: Failed to connect to server over TCP", LOGLEVEL_ERROR);
         return false;
