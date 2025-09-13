@@ -103,7 +103,6 @@
         "Gateway": "192.168.1.250",
         "Hostname": "DEVIQ-LAB",
         "IP Address": "192.168.2.30",
-        "MAC Address": "3C:61:05:64:59:44",
         "Netmask": "255.255.255.0",
         "Online Checking": true,
         "Online Checking Minutes": 1,

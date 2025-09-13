@@ -33,7 +33,7 @@ void ClientManager::handleUdpPacket(AsyncUDPPacket& packet) {
     else if (request == "Remove") { handleRemove(doc, senderIp); }
     else if (request == "Update") { handleUpdate(doc, senderIp); }
     else if (request == "Pull") { Pull(doc); }
-    else if (request == "Push") { handlePush(doc, senderIp); }
+    else if (request == "Push") { Push(doc); }
     else { devLog->Write("Orchestrator: Unknown request [" + request + "]", LOGLEVEL_WARNING); }
 }
 
@@ -156,6 +156,102 @@ bool ClientManager::Pull(const JsonVariantConst& cmd) {
     return true;
 }
 
+bool ClientManager::Push(const JsonVariantConst& cmd) {
+    if (!CheckOrchestratorAssignedAndServerID(cmd)) return false;
+
+    fs::File file = devFileSystem->OpenFile("/tmp_config.json", "w");
+    if (!file) {
+        devLog->Write("Orchestrator: Failed to open temporary file for writing", LOGLEVEL_ERROR);
+        return false;
+    }
+
+    IPAddress serverip;
+    uint16_t serverport = devConfiguration->Setting["Orchestrator"]["Port"].as<uint16_t>();
+
+    if (serverip.fromString(devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>())) {
+        connectAndExchangeJson(serverip, serverport, [&](WiFiClient& client) {
+            JsonDocument reply;
+            reply["Provider"] = mManagerName;
+            reply["Command"] = "Push";
+            reply["Parameter"] = devNetwork->MAC_Address();
+
+            String json;
+            serializeJson(reply, json);
+            client.print(json);
+
+            devLog->Write("Orchestrator: Requested device configuration file to " + serverip.toString() + ":" + String(serverport), LOGLEVEL_INFO);
+
+            const size_t chunkSize = 128;
+            uint8_t buffer[chunkSize];
+            unsigned long start = millis();
+            size_t totalWritten = 0;
+
+            while ((millis() - start) < 5000) {
+                int len = client.read(buffer, chunkSize);
+                if (len > 0) {
+                    file.write(buffer, len);
+                    totalWritten += len;
+                    start = millis();
+                } else {
+                    delay(1);
+                }
+            }
+
+            file.close();
+            devLog->Write("Orchestrator: Received new config file (" + String(totalWritten) + " bytes)", LOGLEVEL_INFO);
+
+            file = devFileSystem->OpenFile("/tmp_config.json", "r");
+            if (!file) {
+                devLog->Write("Orchestrator: Failed to reopen pushed config file for reading", LOGLEVEL_ERROR);
+                return;
+            }
+
+            JsonDocument doc;
+            DeserializationError err = deserializeJson(doc, file);
+            file.close();
+
+            if (err) {
+                devLog->Write("Orchestrator: Failed to parse config JSON from file " + String(err.c_str()), LOGLEVEL_ERROR);
+                return;
+            }
+
+            JsonVariantConst result = doc["Result"];
+            if (result.isNull() || !result.is<JsonObjectConst>()) {
+                devLog->Write("Orchestrator: Missing or invalid 'Result' field in pushed JSON", LOGLEVEL_ERROR);
+                return;
+            }
+
+            JsonObjectConst pushed = result.as<JsonObjectConst>();
+
+            JsonObjectConst pushedOrch = pushed["Orchestrator"];
+            bool pushedAssigned = pushedOrch["Assigned"] | false;
+            String pushedServerID = pushedOrch["Server ID"] | "";
+
+            bool currentAssigned = devConfiguration->Setting["Orchestrator"]["Assigned"] | false;
+            String currentServerID = devConfiguration->Setting["Orchestrator"]["Server ID"] | "";
+
+            if (currentAssigned && pushedServerID != currentServerID) {
+                devLog->Write("Orchestrator: Rejected pushed config - Server ID mismatch (" + pushedServerID + " vs " + currentServerID + ")", LOGLEVEL_WARNING);
+                return;
+            }
+
+            devConfiguration->Setting.clear();
+            devConfiguration->Setting.set(pushed);
+            devConfiguration->Critical();
+            devLog->Write("Orchestrator: New config applied and saved", LOGLEVEL_INFO);
+
+            devFileSystem->DeleteFile("/tmp_config.json");
+
+            Restart(cmd);
+        });
+    } else {
+        devLog->Write("Orchestrator: Error reuesting configuration file to " + devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>()+ ":" + String(serverport), LOGLEVEL_ERROR);
+        return false;
+    }
+
+    return true;
+}
+
 void ClientManager::handleAdd(const JsonVariantConst& cmd, IPAddress remoteIp) {
     if (devConfiguration->Setting["Orchestrator"]["Assigned"].as<bool>() == true) {
         devLog->Write("Orchestrator: Add request ignored - Device assigned to server ID " + devConfiguration->Setting["Orchestrator"]["Server ID"].as<String>(), LOGLEVEL_WARNING);
@@ -240,84 +336,6 @@ void ClientManager::handleUpdate(const JsonVariantConst& cmd, IPAddress remoteIp
     
     devLog->Write("Orchestrator: Received Update command", LOGLEVEL_INFO);
     g_cmdCheckNow = true;
-}
-
-void ClientManager::handlePush(const JsonVariantConst& cmd, IPAddress remoteIp) {
-    fs::File file = devFileSystem->OpenFile("/tmp_config.json", "w");
-    if (!file) {
-        devLog->Write("Orchestrator: Failed to open temporary file for writing", LOGLEVEL_ERROR);
-        return;
-    }
-
-    connectAndExchangeJson(remoteIp, cmd["Reply Port"] | 30030, [&](WiFiClient& client) {
-        const size_t chunkSize = 128;
-        uint8_t buffer[chunkSize];
-        unsigned long start = millis();
-        size_t totalWritten = 0;
-
-        while ((millis() - start) < 5000) {
-            int len = client.read(buffer, chunkSize);
-            if (len > 0) {
-                file.write(buffer, len);
-                totalWritten += len;
-                start = millis();
-            } else {
-                delay(1);
-            }
-        }
-
-        file.close();
-        devLog->Write("Orchestrator: Received new config file (" + String(totalWritten) + " bytes)", LOGLEVEL_INFO);
-    });
-
-    file = devFileSystem->OpenFile("/tmp_config.json", "r");
-    if (!file) {
-        devLog->Write("Orchestrator: Failed to reopen pushed config file for reading", LOGLEVEL_ERROR);
-        return;
-    }
-
-    JsonDocument doc;
-    DeserializationError err = deserializeJson(doc, file);
-    file.close();
-
-    if (err) {
-        devLog->Write("Orchestrator: Failed to parse config JSON from file " + String(err.c_str()), LOGLEVEL_ERROR);
-        return;
-    }
-
-    JsonObject pushed = doc.as<JsonObject>();
-
-    JsonObjectConst pushedOrch = pushed["Orchestrator"];
-    bool pushedAssigned = pushedOrch["Assigned"] | false;
-    String pushedServerID = pushedOrch["Server ID"] | "";
-
-    bool currentAssigned = devConfiguration->Setting["Orchestrator"]["Assigned"] | false;
-    String currentServerID = devConfiguration->Setting["Orchestrator"]["Server ID"] | "";
-
-    if (currentAssigned && pushedServerID != currentServerID) {
-        devLog->Write("Orchestrator: Rejected pushed config - Server ID mismatch (" + pushedServerID + " vs " + currentServerID + ")", LOGLEVEL_WARNING);
-        return;
-    }
-
-    devConfiguration->Setting.clear();
-    devConfiguration->Setting.set(pushed);
-    devConfiguration->Critical();
-    devLog->Write("Orchestrator: New config applied and saved", LOGLEVEL_INFO);
-
-    // Send ACK JSON
-    connectAndExchangeJson(remoteIp, cmd["Reply Port"] | 30030, [&](WiFiClient& client) {
-        DynamicJsonDocument ackDoc(128);
-        ackDoc["Result"] = "Config Applied";
-
-        String ack;
-        serializeJson(ackDoc, ack);
-        client.print(ack);
-        devLog->Write("Orchestrator: Sent JSON ACK to " + ack, LOGLEVEL_INFO);
-    });
-
-    devFileSystem->DeleteFile("/tmp_config.json");
-
-    if (cmd["Apply"].as<bool>()) Restart(cmd);
 }
 
 bool ClientManager::connectAndExchangeJson(IPAddress remoteIp, uint16_t port, std::function<void(WiFiClient&)> exchange) {

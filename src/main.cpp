@@ -99,6 +99,8 @@ void setup() {
     devNetwork->OnlineChecking(devConfiguration->Setting["Network"]["Online Checking"].as<bool>());
     devNetwork->OnlineCheckingMinutes(devConfiguration->Setting["Network"]["Online Checking Minutes"].as<uint16_t>());
 
+    devConfiguration->Setting["Network"]["MAC Address"] = devNetwork->MAC_Address();
+
     // Update
     devUpdateClient = new UpdateClient([&]{
         DeviceIQ_Update::UpdateConfig c;
