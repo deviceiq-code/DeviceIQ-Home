@@ -10,6 +10,11 @@
 #include <DevIQ_Log.h>
 #include <DevIQ_Update.h>
 
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <WiFiClientSecure.h>
+#include <HTTPClient.h>
+
 #include <AsyncTCP.h>
 #include <AsyncUDP.h>
 
@@ -117,6 +122,9 @@ void setup() {
         c.httpTimeoutMs = 15000u;
         c.streamBufSize = size_t(4096);
         c.autoReboot = devConfiguration->Setting["Update"]["Auto Reboot"] | Defaults.Update.AutoReboot;
+
+        devLog->Write("Allow Insecure: " + String(c.allowInsecure ? "Yes" : "No"), LOGLEVEL_INFO);
+
         return c;
     }());
 
@@ -688,17 +696,20 @@ void loop() {
                 bool hasUpd = false, forced = false;
 
                 if (devUpdateClient->CheckForUpdate(mf, &hasUpd, &forced)) {
-                if (hasUpd) {
-                    if (!s_updating) {
-                    s_updating = true;
-                    devUpdateClient->InstallLatest();
+                    if (hasUpd) {
+                        if (!s_updating) {
+                        s_updating = true;
+                        devUpdateClient->InstallLatest();
+                        }
+                    } else {
+                        devLog->Write("Update Client: No update available", LOGLEVEL_INFO);
                     }
                 } else {
-                    devLog->Write("Update Client: No update available", LOGLEVEL_INFO);
-                }
-                } else {
-                devLog->Write("Update Client: Check failed (network/manifest)", LOGLEVEL_ERROR);
-                s_updating = false;
+                    devLog->Write("Update Client: Check failed (network, manifest, model not compatible)", LOGLEVEL_ERROR);
+
+                    devLog->Write("URL: " + devUpdateClient->ManifestURL(), LOGLEVEL_INFO);
+                    
+                    s_updating = false;
                 }
             }
             }

@@ -31,46 +31,10 @@ void ClientManager::handleUdpPacket(AsyncUDPPacket& packet) {
     else if (request == "Refresh") { Refresh(doc); }
     else if (request == "Add") { handleAdd(doc, senderIp); }
     else if (request == "Remove") { handleRemove(doc, senderIp); }
-    else if (request == "Update") { handleUpdate(doc, senderIp); }
+    else if (request == "Update") { Update(doc); }
     else if (request == "Pull") { Pull(doc); }
     else if (request == "Push") { Push(doc); }
     else { devLog->Write("Orchestrator: Unknown request [" + request + "]", LOGLEVEL_WARNING); }
-}
-
-bool ClientManager::Restart(const JsonVariantConst& cmd) {
-    if (devConfiguration->Setting["Orchestrator"]["Assigned"].as<bool>() && cmd["Server ID"] != devConfiguration->Setting["Orchestrator"]["Server ID"].as<String>()) {
-        devLog->Write("Orchestrator: Ignoring Refresh command - Server ID mismatch", LOGLEVEL_WARNING);
-        return false;
-    }
-
-    IPAddress serverip;
-    uint16_t serverport = devConfiguration->Setting["Orchestrator"]["Port"].as<uint16_t>();
-
-    if (serverip.fromString(devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>())) {
-        connectAndExchangeJson(serverip, serverport, [&](WiFiClient& client) {
-            JsonDocument reply;
-            reply["Provider"] = mManagerName;
-            reply["Command"] = "Restart";
-            reply["Parameter"] = "ACK";
-            reply["Hostname"] = devNetwork->Hostname();
-
-            String json;
-            serializeJson(reply, json);
-            client.print(json);
-
-            devLog->Write("Orchestrator: Replied Restart command to " + serverip.toString(), LOGLEVEL_INFO);
-        });
-    } else {
-        devLog->Write("Orchestrator: Error sending ACK to " + devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>()+ ":" + String(serverport), LOGLEVEL_ERROR);
-        return false;
-    }
-
-    devLog->Write("Orchestrator: Replied Restart command to " + serverip.toString() + ":" + String(serverport), LOGLEVEL_INFO);
-    
-    esp_sleep_enable_timer_wakeup(200 * 1000);
-    esp_deep_sleep_start();
-
-    return true;
 }
 
 bool ClientManager::CheckOrchestratorAssignedAndServerID(const JsonObjectConst &cmd) {
@@ -318,24 +282,69 @@ void ClientManager::handleRemove(const JsonVariantConst& cmd, IPAddress remoteIp
     devLog->Write("Orchestrator: Removed assignment to server ID " + oldServer, LOGLEVEL_INFO);
 }
 
-void ClientManager::handleUpdate(const JsonVariantConst& cmd, IPAddress remoteIp) {
-    if (!devConfiguration->Setting["Orchestrator"]["Assigned"].as<bool>()) {
-        devLog->Write("Orchestrator: Update ignored - Device is not assigned", LOGLEVEL_WARNING);
-        return;
+bool ClientManager::Restart(const JsonVariantConst& cmd) {
+    if (devConfiguration->Setting["Orchestrator"]["Assigned"].as<bool>() && cmd["Server ID"] != devConfiguration->Setting["Orchestrator"]["Server ID"].as<String>()) {
+        devLog->Write("Orchestrator: Ignoring Refresh command - Server ID mismatch", LOGLEVEL_WARNING);
+        return false;
     }
 
-    if (cmd["Server ID"].as<String>() != devConfiguration->Setting["Orchestrator"]["Server ID"].as<String>()) {
-        devLog->Write("Orchestrator: Update ignored - Server ID mismatch", LOGLEVEL_WARNING);
-        return;
-    }
+    IPAddress serverip;
+    uint16_t serverport = devConfiguration->Setting["Orchestrator"]["Port"].as<uint16_t>();
 
-    if (cmd["MAC Address"].as<String>() != devNetwork->MAC_Address()) {
-        devLog->Write("Orchestrator: Update ignored - MAC address mismatch", LOGLEVEL_WARNING);
-        return;
+    if (serverip.fromString(devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>())) {
+        connectAndExchangeJson(serverip, serverport, [&](WiFiClient& client) {
+            JsonDocument reply;
+            reply["Provider"] = mManagerName;
+            reply["Command"] = "Restart";
+            reply["Parameter"] = "ACK";
+            reply["Hostname"] = devNetwork->Hostname();
+
+            String json;
+            serializeJson(reply, json);
+            client.print(json);
+
+            devLog->Write("Orchestrator: Replied Restart command to " + serverip.toString() + ":" + String(serverport), LOGLEVEL_INFO);
+        });
+    } else {
+        devLog->Write("Orchestrator: Error sending Restart ACK to " + devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>()+ ":" + String(serverport), LOGLEVEL_ERROR);
     }
     
-    devLog->Write("Orchestrator: Received Update command", LOGLEVEL_INFO);
+    esp_sleep_enable_timer_wakeup(200 * 1000);
+    esp_deep_sleep_start();
+
+    return true;
+}
+
+bool ClientManager::Update(const JsonVariantConst& cmd) {
+    if (devConfiguration->Setting["Orchestrator"]["Assigned"].as<bool>() && cmd["Server ID"] != devConfiguration->Setting["Orchestrator"]["Server ID"].as<String>()) {
+        devLog->Write("Orchestrator: Ignoring Update command - Server ID mismatch", LOGLEVEL_WARNING);
+        return false;
+    }
+
+    IPAddress serverip;
+    uint16_t serverport = devConfiguration->Setting["Orchestrator"]["Port"].as<uint16_t>();
+
+    if (serverip.fromString(devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>())) {
+        connectAndExchangeJson(serverip, serverport, [&](WiFiClient& client) {
+            JsonDocument reply;
+            reply["Provider"] = mManagerName;
+            reply["Command"] = "Update";
+            reply["Parameter"] = "ACK";
+            reply["Hostname"] = devNetwork->Hostname();
+
+            String json;
+            serializeJson(reply, json);
+            client.print(json);
+
+            devLog->Write("Orchestrator: Replied Update command to " + serverip.toString() + ":" + String(serverport), LOGLEVEL_INFO);
+        });
+    } else {
+        devLog->Write("Orchestrator: Error sending Update ACK to " + devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>()+ ":" + String(serverport), LOGLEVEL_ERROR);
+    }
+    
     g_cmdCheckNow = true;
+
+    return true;
 }
 
 bool ClientManager::connectAndExchangeJson(IPAddress remoteIp, uint16_t port, std::function<void(WiFiClient&)> exchange) {

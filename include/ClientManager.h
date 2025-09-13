@@ -32,6 +32,7 @@ class ClientManager {
         bool Restart(const JsonVariantConst& cmd);
         bool Discover(const JsonVariantConst& cmd);
         bool Refresh(const JsonVariantConst& cmd);
+        bool Update(const JsonVariantConst& cmd);
         bool Pull(const JsonVariantConst& cmd);
         bool Push(const JsonVariantConst& cmd);
 
@@ -44,7 +45,6 @@ class ClientManager {
 
         void handleAdd(const JsonVariantConst& cmd, IPAddress remoteIp);
         void handleRemove(const JsonVariantConst& cmd, IPAddress remoteIp);
-        void handleUpdate(const JsonVariantConst& cmd, IPAddress remoteIp);
 
         bool connectAndExchangeJson(IPAddress remoteIp, uint16_t port, std::function<void(WiFiClient&)> exchange);
         

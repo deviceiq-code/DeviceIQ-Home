@@ -7,7 +7,7 @@
             "Enabled": true,
             "Events": {},
             "Name": "OL1_Relay",
-            "State": true
+            "State": false
         },
         {
             "Address": 27,
@@ -16,7 +16,7 @@
             "Enabled": true,
             "Events": {},
             "Name": "OL2_Relay",
-            "State": true
+            "State": false
         },
         {
             "Address": 26,
@@ -73,13 +73,6 @@
         "NTP Server": "pool.ntp.org",
         "NTP Update": true
     },
-    "Update": {
-        "Debug": false,
-        "Allow Insecure": true,
-        "Update Manifest": "https://server.dts-networ.com:8081/update.json",
-        "Check Interval": 172800000,
-        "Auto Reboot": true
-    },
     "Log": {
         "Endpoint": 7,
         "Level": 7,
@@ -103,6 +96,7 @@
         "Gateway": "192.168.1.250",
         "Hostname": "DEVIQ-LAB",
         "IP Address": "192.168.2.30",
+        "MAC Address": "D8:13:2A:7E:EE:C4",
         "Netmask": "255.255.255.0",
         "Online Checking": true,
         "Online Checking Minutes": 1,
@@ -111,9 +105,9 @@
     },
     "Orchestrator": {
         "Assigned": true,
-        "Server ID": "ZCZ95YJJ693UF78",
-        "IP Address": "192.168.2.144",
-        "Port": 30030
+        "IP Address": "192.168.2.10",
+        "Port": 30030,
+        "Server ID": "ZCZ95YJJ693UF78"
     },
     "Security": {
         "Security Level": 7,
@@ -129,6 +123,13 @@
                 "Password": "user"
             }
         ]
+    },
+    "Update": {
+        "Allow Insecure": true,
+        "Auto Reboot": true,
+        "Check Interval": 172800000,
+        "Debug": false,
+        "Update Manifest": "https://server.dts-network.com:8081/update.json"
     },
     "Webhooks": {
         "Enabled": true,
