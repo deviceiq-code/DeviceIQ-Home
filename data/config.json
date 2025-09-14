@@ -129,7 +129,7 @@
         "Auto Reboot": true,
         "Check Interval": 172800000,
         "Debug": false,
-        "Update Manifest": "https://server.dts-network.com:8081/update.json"
+        "Update Manifest": "https://server.dts-network.com:8081/update-home.json"
     },
     "Webhooks": {
         "Enabled": true,

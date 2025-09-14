@@ -11,7 +11,88 @@ extern bool g_cmdCheckNow;
 
 ClientManager& ClientManager::getInstance() { static ClientManager instance; return instance; }
 
+const JsonObjectConst ClientManager::SendUPD(const String &target, const uint16_t port, const JsonObjectConst &payload) {
+    s_doc.clear();
+
+    if (WiFi.status() != WL_CONNECTED) return JsonObjectConst(); // vazio
+
+    if (s_sem == nullptr) {
+        s_sem = xSemaphoreCreateBinary();
+        if (!s_sem) return JsonObjectConst();
+    }
+
+    IPAddress ip;
+    if (target.equalsIgnoreCase("broadcast")) {
+        ip = IPAddress(255, 255, 255, 255);
+    } else if (!ip.fromString(target)) {
+        if (!WiFi.hostByName(target.c_str(), ip)) return JsonObjectConst();
+    }
+
+    s_udp.close();
+    if (!s_udp.listen(0)) return JsonObjectConst();
+
+    s_rx = "";
+    s_rip = IPAddress();
+
+    s_udp.onPacket([](AsyncUDPPacket p) {
+        if (s_rx.isEmpty()) {
+            s_rip = p.remoteIP();
+            s_rx  = String((const char*)p.data(), p.length());
+            xSemaphoreGive(s_sem);
+        }
+    });
+
+    String out;
+    serializeJson(payload, out);
+
+    if (s_udp.writeTo((const uint8_t*)out.c_str(), out.length(), ip, port) == 0) {
+        s_udp.close();
+        return JsonObjectConst();
+    }
+
+    const uint32_t timeout_ms = 1000;
+    if (xSemaphoreTake(s_sem, pdMS_TO_TICKS(timeout_ms)) != pdTRUE) {
+        s_udp.close();
+        return JsonObjectConst();
+    }
+
+    DeserializationError err = deserializeJson(s_doc, s_rx.c_str(), s_rx.length());
+    if (!err) {
+        s_udp.close();
+        return s_doc.as<JsonObjectConst>();
+    }
+
+    s_doc.clear();
+    {
+        JsonObject root = s_doc.to<JsonObject>();
+        root["Payload"] = s_rx;
+        root["Size"]    = (size_t)s_rx.length();
+
+        char ipstr[16];
+        snprintf(ipstr, sizeof(ipstr), "%u.%u.%u.%u", s_rip[0], s_rip[1], s_rip[2], s_rip[3]);
+        root["From"] = ipstr;
+    }
+
+    s_udp.close();
+    return s_doc.as<JsonObjectConst>();
+}
+
 void ClientManager::begin() {
+    JsonDocument doc;
+    doc["Orchestrator"] = "Discover";
+
+    auto reply = SendUPD("255.255.255.255", 30030, doc.as<JsonObjectConst>());
+    if (!reply.isNull()) {
+        if (reply["Orchestrator"]["Server ID"].as<String>().equalsIgnoreCase(devConfiguration->Setting["Orchestrator"]["Server ID"].as<String>()) && !reply["Orchestrator"]["IP Address"].as<String>().equalsIgnoreCase(devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>())) {
+            devConfiguration->Setting["Orchestrator"]["IP Address"] = reply["Orchestrator"]["IP Address"];
+            devConfiguration->Critical();
+
+            devLog->Write("Orchestrator: Server IP address updated to " + devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>(), LOGLEVEL_INFO);
+        }
+    } else {
+        devLog->Write("Orchestrator: Server not found in this network", LOGLEVEL_WARNING);
+    }
+
     if (!udp.listen(30030)) { devLog->Write("Orchestrator: Failed to start UDP listener on port 30030", LOGLEVEL_ERROR); return; }
     udp.onPacket([this](AsyncUDPPacket packet) { this->handleUdpPacket(packet); });
 }

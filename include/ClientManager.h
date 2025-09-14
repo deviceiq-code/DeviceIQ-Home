@@ -9,6 +9,9 @@
 #include <DevIQ_Log.h>
 #include <DevIQ_Network.h>
 #include <DevIQ_DateTime.h>
+#include <Arduino.h>
+#include <WiFi.h>
+#include <WiFiUdp.h>
 #include <AsyncUDP.h>
 #include <WiFiClient.h>
 
@@ -19,6 +22,12 @@ using namespace DeviceIQ_Network;
 using namespace DeviceIQ_DateTime;
 
 enum DiscoveryMode { DISCOVERY_NONE, DISCOVERY_ALL, DISCOVERY_UNMANAGED, DISCOVERY_MANAGED };
+
+static JsonDocument s_doc;
+static AsyncUDP s_udp;
+static SemaphoreHandle_t s_sem;
+static String s_rx;
+static IPAddress s_rip;
 
 class ClientManager {
     public:
@@ -35,6 +44,10 @@ class ClientManager {
         bool Update(const JsonVariantConst& cmd);
         bool Pull(const JsonVariantConst& cmd);
         bool Push(const JsonVariantConst& cmd);
+
+        const JsonObjectConst SendUPD(const String &target, const uint16_t port, const JsonObjectConst &payload);
+
+        bool FindOrchestratorServer();
 
     private:
         ClientManager() = default;                  // private ctor for singleton

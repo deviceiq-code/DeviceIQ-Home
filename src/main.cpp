@@ -123,8 +123,6 @@ void setup() {
         c.streamBufSize = size_t(4096);
         c.autoReboot = devConfiguration->Setting["Update"]["Auto Reboot"] | Defaults.Update.AutoReboot;
 
-        devLog->Write("Allow Insecure: " + String(c.allowInsecure ? "Yes" : "No"), LOGLEVEL_INFO);
-
         return c;
     }());
 
@@ -432,7 +430,6 @@ void setup() {
                 ClientManager::getInstance().begin();
                 if (devConfiguration->Setting["Orchestrator"]["Assigned"].as<bool>()) {
                     devLog->Write("Orchestrator: Device assigned to server ID " + devConfiguration->Setting["Orchestrator"]["Server ID"].as<String>(), LOGLEVEL_WARNING);
-
                     JsonDocument cmd;
                     cmd["Server ID"] = devConfiguration->Setting["Orchestrator"]["Server ID"];
                     
