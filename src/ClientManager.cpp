@@ -1,4 +1,5 @@
 #include <LittleFS.h>
+#include "Tools.h"
 #include "ClientManager.h"
 #include "Version.h"
 
@@ -115,6 +116,7 @@ void ClientManager::handleUdpPacket(AsyncUDPPacket& packet) {
     else if (request == "Update") { Update(doc); }
     else if (request == "Pull") { Pull(doc); }
     else if (request == "Push") { Push(doc); }
+    else if (request == "GetLog") { GetLog(doc); }
     else { devLog->Write("Orchestrator: Unknown request [" + request + "]", LOGLEVEL_WARNING); }
 }
 
@@ -172,6 +174,36 @@ bool ClientManager::Refresh(const JsonVariantConst& cmd) {
     if (!CheckOrchestratorAssignedAndServerID(cmd)) return false;
 
     return Discover(cmd);
+}
+
+bool ClientManager::GetLog(const JsonVariantConst& cmd) {
+    if (!CheckOrchestratorAssignedAndServerID(cmd)) return false;
+
+    IPAddress serverip;
+    uint16_t serverport = devConfiguration->Setting["Orchestrator"]["Port"].as<uint16_t>();
+    String LOG_PATH = "/syslog.log";
+
+    if (devFileSystem->Exists(LOG_PATH)) {
+        File f =  devFileSystem->OpenFile(LOG_PATH, "r");
+        uint32_t crc = CRC32_File(f);
+        size_t fileSize = f.size();
+
+        bool ok = false;
+
+        if (serverip.fromString(devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>())) {
+            connectAndExchangeJson(serverip, serverport, [&](WiFiClient& client) {
+                ok = StreamFileAsBase64Json(LOG_PATH, client, f, fileSize, crc);
+                devLog->Write("Orchestrator: Sent device log file to " + serverip.toString() + ":" + String(serverport), LOGLEVEL_INFO);
+            });
+            return true;
+        } else {
+            devLog->Write("Orchestrator: Error sending log file to " + devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>()+ ":" + String(serverport), LOGLEVEL_ERROR);
+        }
+    } else {
+        devLog->Write("Orchestrator: File " + LOG_PATH + " not found", LOGLEVEL_ERROR);
+    }
+
+    return false;
 }
 
 bool ClientManager::Pull(const JsonVariantConst& cmd) {

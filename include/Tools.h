@@ -4,6 +4,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <mbedtls/base64.h>
 #include <ESPAsyncWebServer.h>
 #include <DevIQ_Configuration.h>
 #include <DevIQ_Log.h>
@@ -56,5 +57,9 @@ void registerEndpoint(AsyncWebServer* server, TComponent component, const char* 
         }
     });
 }
+
+bool StreamFileAsBase64Json(String &fileName, WiFiClient &client, File &f, size_t fileSize, uint32_t crc32 = 0);
+uint32_t CRC32_Update(uint32_t crc, const uint8_t* data, size_t len);
+uint32_t CRC32_File(File& f);
 
 #endif
