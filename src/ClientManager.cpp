@@ -99,9 +99,14 @@ void ClientManager::begin() {
 }
 
 void ClientManager::handleUdpPacket(AsyncUDPPacket& packet) {
+    // Debug - print whatever arrives
+    // Serial.printf("\r\n---\r\n");
+    // Serial.println((char*)packet.data());
+    // Serial.printf("---\r\n");
+    // 
+
     JsonDocument doc;
     if (deserializeJson(doc, packet.data(), packet.length()) != DeserializationError::Ok) {
-        devLog->Write("Orchestrator: Invalid JSON received over UDP", LOGLEVEL_WARNING);
         return;
     }
 
@@ -192,7 +197,7 @@ bool ClientManager::GetLog(const JsonVariantConst& cmd) {
 
         if (serverip.fromString(devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>())) {
             connectAndExchangeJson(serverip, serverport, [&](WiFiClient& client) {
-                ok = StreamFileAsBase64Json(LOG_PATH, client, f, fileSize, crc);
+                ok = StreamFileAsBase64Json(LOG_PATH, devNetwork->MAC_Address(), client, f, fileSize, crc);
                 devLog->Write("Orchestrator: Sent device log file to " + serverip.toString() + ":" + String(serverport), LOGLEVEL_INFO);
             });
             return true;

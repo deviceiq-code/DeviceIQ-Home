@@ -84,8 +84,13 @@ bool hasValidHeaderToken(AsyncWebServerRequest *request, String api_token) {
     return false;
 }
 
-bool StreamFileAsBase64Json(String &fileName, WiFiClient &client, File &f, size_t fileSize, uint32_t crc32) {
+bool StreamFileAsBase64Json(String fileName, String macAddress, WiFiClient &client, File &f, size_t fileSize, uint32_t crc32) {
+    client.setNoDelay(true);
+
     client.print(F("{\"Provider\":\"Orchestrator\",\"Command\":\"GetLog\",\"Parameter\":{"));
+    client.print(F("\"MAC Address\":\""));
+    client.print(macAddress);
+    client.print(F("\","));
     client.print(F("\"Filename\":\""));
     client.print(fileName);
     client.print(F("\","));
@@ -97,56 +102,65 @@ bool StreamFileAsBase64Json(String &fileName, WiFiClient &client, File &f, size_
     client.print(crcbuf);
     client.print(F("\",\"Data\":\""));
 
+    // ======= ESSE helper é o que muda =======
+    const uint32_t IDLE_TIMEOUT_MS = 15000;     // timeout por INATIVIDADE
+    const size_t   MAX_TRY_CHUNK   = 1024;      // tamanho de tentativa (seguro p/ TCP)
+
+    auto writeAll = [&](const uint8_t* buf, size_t len) -> bool {
+        size_t sent = 0;
+        uint32_t lastProgress = millis();
+        while (sent < len) {
+            if (!client.connected()) return false;
+
+            size_t toSend = len - sent;
+            if (toSend > MAX_TRY_CHUNK) toSend = MAX_TRY_CHUNK;
+
+            int w = client.write(buf + sent, (int)toSend);  // tente SEM checar availableForWrite
+            if (w > 0) {
+                sent += (size_t)w;
+                lastProgress = millis();         // reset no progresso
+            } else if (w == 0) {
+                // Sem progresso agora; ceda CPU e tente de novo
+                delay(1);
+            } else { // w < 0
+                return false;
+            }
+
+            if (millis() - lastProgress > IDLE_TIMEOUT_MS) return false;
+            yield();
+        }
+        return true;
+    };
+    // ========================================
+
     bool ok = true;
 
-    static const size_t IN_CHUNK  = 3 * 256;   // múltiplo de 3
-    static const size_t OUT_CHUNK = 4 * 256;
+    static const size_t IN_CHUNK  = 3 * 128;    // múltiplo de 3 (menor = mais suave)
+    static const size_t OUT_CHUNK = 4 * 128;
 
     std::unique_ptr<uint8_t[]> inBuf(new (std::nothrow) uint8_t[IN_CHUNK]);
     std::unique_ptr<unsigned char[]> outBuf(new (std::nothrow) unsigned char[OUT_CHUNK + 4]);
-
-    if (!inBuf || !outBuf) {
-        ok = false;
-    }
+    if (!inBuf || !outBuf) ok = false;
 
     if (ok) {
         while (true) {
             size_t n = f.read(inBuf.get(), IN_CHUNK);
-            if (n == 0) break;  // fim do arquivo
+            if (n == 0) break;
 
             size_t olen = 0;
             int ret = mbedtls_base64_encode(outBuf.get(), OUT_CHUNK + 4, &olen, inBuf.get(), n);
             if (ret != 0) { ok = false; break; }
 
-            // Enviar todo o bloco codificado, respeitando backpressure
-            size_t sent = 0;
-            uint32_t t0 = millis();
-            while (sent < olen) {
-                if (!client.connected()) { ok = false; break; }
-
-                int avail = client.availableForWrite();
-                if (avail > 0) {
-                    int toSend = (int)min<size_t>((size_t)avail, olen - sent);
-                    int w = client.write(outBuf.get() + sent, toSend);
-                    if (w < 0) { ok = false; break; }
-                    sent += (size_t)w;
-                    yield();
-                } else {
-                    delay(1); // dá fôlego ao Wi-Fi
-                }
-
-                // timeout por bloco (10s é bastante)
-                if (millis() - t0 > 10000) { ok = false; break; }
-            }
-
-            if (!ok) break;
+            if (!writeAll(outBuf.get(), olen)) { ok = false; break; }
             yield();
         }
     }
 
-    client.print(F("\"}}"));
-    client.flush();
-    return true;
+    if (client.connected()) {
+        client.print(F("\"}}"));
+    }
+
+    return ok;
 }
 
 uint32_t CRC32_Update(uint32_t crc, const uint8_t* data, size_t len) {
