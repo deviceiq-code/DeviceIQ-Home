@@ -122,6 +122,7 @@ void ClientManager::handleUdpPacket(AsyncUDPPacket& packet) {
     else if (request == "Pull") { Pull(doc); }
     else if (request == "Push") { Push(doc); }
     else if (request == "GetLog") { GetLog(doc); }
+    else if (request == "ClearLog") { ClearLog(doc); }
     else { devLog->Write("Orchestrator: Unknown request [" + request + "]", LOGLEVEL_WARNING); }
 }
 
@@ -209,6 +210,33 @@ bool ClientManager::GetLog(const JsonVariantConst& cmd) {
     }
 
     return false;
+}
+
+bool ClientManager::ClearLog(const JsonVariantConst& cmd) {
+    if (!CheckOrchestratorAssignedAndServerID(cmd)) return false;
+
+    IPAddress serverip;
+    uint16_t serverport = devConfiguration->Setting["Orchestrator"]["Port"].as<uint16_t>();
+
+    if (serverip.fromString(devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>())) {
+        connectAndExchangeJson(serverip, serverport, [&](WiFiClient& client) {
+            JsonDocument reply;
+            reply["Provider"] = mManagerName;
+            reply["Command"] = "ClearLog";
+            reply["Parameter"] = "ACK";
+            reply["Hostname"] = devNetwork->Hostname();
+
+            String json;
+            serializeJson(reply, json);
+            client.print(json);
+
+            devLog->Write("Orchestrator: Replied ClearLog command to " + serverip.toString() + ":" + String(serverport), LOGLEVEL_INFO);
+        });
+    } else {
+        devLog->Write("Orchestrator: Error sending ClearLog ACK to " + devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>()+ ":" + String(serverport), LOGLEVEL_ERROR);
+    }
+
+    return devLog->Clear();
 }
 
 bool ClientManager::Pull(const JsonVariantConst& cmd) {
