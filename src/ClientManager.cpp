@@ -117,7 +117,7 @@ void ClientManager::handleUdpPacket(AsyncUDPPacket& packet) {
     else if (request == "Restart") { Restart(doc); }
     else if (request == "Refresh") { Refresh(doc); }
     else if (request == "Add") { handleAdd(doc, senderIp); }
-    else if (request == "Remove") { handleRemove(doc, senderIp); }
+    else if (request == "Remove") { Remove(doc); }
     else if (request == "Update") { Update(doc); }
     else if (request == "Pull") { Pull(doc); }
     else if (request == "Push") { Push(doc); }
@@ -153,6 +153,8 @@ bool ClientManager::Discover(const JsonVariantConst& cmd) {
             JsonDocument reply;
             reply["Provider"] = mManagerName;
             reply["Command"] = "Discover";
+            reply["Hostname"] = devNetwork->Hostname();
+            reply["MAC Address"] = devNetwork->MAC_Address();
             reply["Parameter"]["Server ID"] = devConfiguration->Setting["Orchestrator"]["Server ID"].as<String>();
             reply["Parameter"]["Product Name"] = Version.ProductName;
             reply["Parameter"]["Hardware Model"] = Version.Hardware.Model;
@@ -225,6 +227,7 @@ bool ClientManager::ClearLog(const JsonVariantConst& cmd) {
             reply["Command"] = "ClearLog";
             reply["Parameter"] = "ACK";
             reply["Hostname"] = devNetwork->Hostname();
+            reply["MAC Address"] = devNetwork->MAC_Address();
 
             String json;
             serializeJson(reply, json);
@@ -251,6 +254,8 @@ bool ClientManager::Pull(const JsonVariantConst& cmd) {
             reply["Provider"] = mManagerName;
             reply["Command"] = "Pull";
             reply["Parameter"].set(devConfiguration->Setting);
+            reply["Hostname"] = devNetwork->Hostname();
+            reply["MAC Address"] = devNetwork->MAC_Address();
 
             String json;
             serializeJson(reply, json);
@@ -284,6 +289,8 @@ bool ClientManager::Push(const JsonVariantConst& cmd) {
             reply["Provider"] = mManagerName;
             reply["Command"] = "Push";
             reply["Parameter"] = devNetwork->MAC_Address();
+            reply["Hostname"] = devNetwork->Hostname();
+            reply["MAC Address"] = devNetwork->MAC_Address();
 
             String json;
             serializeJson(reply, json);
@@ -393,32 +400,31 @@ void ClientManager::handleAdd(const JsonVariantConst& cmd, IPAddress remoteIp) {
     devLog->Write("Orchestrator: Added assignment to server ID " + devConfiguration->Setting["Orchestrator"]["Server ID"].as<String>(), LOGLEVEL_INFO);
 }
 
-void ClientManager::handleRemove(const JsonVariantConst& cmd, IPAddress remoteIp) {
-    if (!devConfiguration->Setting["Orchestrator"]["Assigned"].as<bool>()) {
-        devLog->Write("Orchestrator: Remove ignored - Device is not assigned", LOGLEVEL_WARNING);
-        return;
+bool ClientManager::Remove(const JsonVariantConst& cmd) {
+    if (!CheckOrchestratorAssignedAndServerID(cmd)) return false;
+
+    IPAddress serverip;
+    uint16_t serverport = devConfiguration->Setting["Orchestrator"]["Port"].as<uint16_t>();
+
+    if (serverip.fromString(devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>())) {
+        connectAndExchangeJson(serverip, serverport, [&](WiFiClient& client) {
+            JsonDocument reply;
+            reply["Provider"] = mManagerName;
+            reply["Command"] = "Remove";
+            reply["Parameter"] = "ACK";
+            reply["Hostname"] = devNetwork->Hostname();
+            reply["MAC Address"] = devNetwork->MAC_Address();
+
+            String json;
+            serializeJson(reply, json);
+            client.print(json);
+
+            devLog->Write("Orchestrator: Replied Remove command to " + serverip.toString() + ":" + String(serverport), LOGLEVEL_INFO);
+        });
+    } else {
+        devLog->Write("Orchestrator: Error sending Remove ACK to " + devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>()+ ":" + String(serverport), LOGLEVEL_ERROR);
     }
-
-    if (cmd["Server ID"].as<String>() != devConfiguration->Setting["Orchestrator"]["Server ID"].as<String>()) {
-        devLog->Write("Orchestrator: Remove ignored - Server ID mismatch", LOGLEVEL_WARNING);
-        return;
-    }
-
-    if (cmd["MAC Address"].as<String>() != devNetwork->MAC_Address()) {
-        devLog->Write("Orchestrator: Remove ignored - MAC address mismatch", LOGLEVEL_WARNING);
-        return;
-    }
-
-    connectAndExchangeJson(remoteIp, cmd["Reply Port"] | 30030, [&](WiFiClient& client) {
-        DynamicJsonDocument reply(512);
-        reply["Orchestrator"]["Status"] = "Removed";
-        reply["DeviceIQ"]["MAC Address"] = devNetwork->MAC_Address();
-
-        String json;
-        serializeJson(reply, json);
-        client.print(json);
-    });
-
+    
     String oldServer = devConfiguration->Setting["Orchestrator"]["Server ID"].as<String>();
 
     devConfiguration->Setting["Orchestrator"]["Assigned"] = false;
@@ -426,6 +432,8 @@ void ClientManager::handleRemove(const JsonVariantConst& cmd, IPAddress remoteIp
     devConfiguration->Critical();
 
     devLog->Write("Orchestrator: Removed assignment to server ID " + oldServer, LOGLEVEL_INFO);
+
+    return true;
 }
 
 bool ClientManager::Restart(const JsonVariantConst& cmd) {
@@ -444,6 +452,7 @@ bool ClientManager::Restart(const JsonVariantConst& cmd) {
             reply["Command"] = "Restart";
             reply["Parameter"] = "ACK";
             reply["Hostname"] = devNetwork->Hostname();
+            reply["MAC Address"] = devNetwork->MAC_Address();
 
             String json;
             serializeJson(reply, json);
@@ -477,6 +486,7 @@ bool ClientManager::Update(const JsonVariantConst& cmd) {
             reply["Command"] = "Update";
             reply["Parameter"] = "ACK";
             reply["Hostname"] = devNetwork->Hostname();
+            reply["MAC Address"] = devNetwork->MAC_Address();
 
             String json;
             serializeJson(reply, json);

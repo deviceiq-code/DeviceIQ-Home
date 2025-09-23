@@ -38,14 +38,16 @@ class ClientManager {
 
         void begin();  // call in setup()
 
-        bool Restart(const JsonVariantConst& cmd);
+        // bool Add(const JsonVariantConst& cmd);
+        bool ClearLog(const JsonVariantConst& cmd);
         bool Discover(const JsonVariantConst& cmd);
-        bool Refresh(const JsonVariantConst& cmd);
-        bool Update(const JsonVariantConst& cmd);
+        bool GetLog(const JsonVariantConst& cmd);
         bool Pull(const JsonVariantConst& cmd);
         bool Push(const JsonVariantConst& cmd);
-        bool GetLog(const JsonVariantConst& cmd);
-        bool ClearLog(const JsonVariantConst& cmd);
+        bool Refresh(const JsonVariantConst& cmd);
+        bool Remove(const JsonVariantConst& cmd);
+        bool Restart(const JsonVariantConst& cmd);
+        bool Update(const JsonVariantConst& cmd);
         
         const JsonObjectConst SendUPD(const String &target, const uint16_t port, const JsonObjectConst &payload);
 
@@ -59,7 +61,6 @@ class ClientManager {
         void handleUdpPacket(AsyncUDPPacket& packet);
 
         void handleAdd(const JsonVariantConst& cmd, IPAddress remoteIp);
-        void handleRemove(const JsonVariantConst& cmd, IPAddress remoteIp);
 
         bool connectAndExchangeJson(IPAddress remoteIp, uint16_t port, std::function<void(WiFiClient&)> exchange);
         
