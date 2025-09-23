@@ -45,6 +45,7 @@ class ClientManager {
         bool Pull(const JsonVariantConst& cmd);
         bool Push(const JsonVariantConst& cmd);
         bool Refresh(const JsonVariantConst& cmd);
+        bool Add(const JsonVariantConst& cmd);
         bool Remove(const JsonVariantConst& cmd);
         bool Restart(const JsonVariantConst& cmd);
         bool Update(const JsonVariantConst& cmd);
