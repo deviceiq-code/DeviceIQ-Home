@@ -100,10 +100,7 @@ void ClientManager::begin() {
 
 void ClientManager::handleUdpPacket(AsyncUDPPacket& packet) {
     // Debug - print whatever arrives
-    // Serial.printf("\r\n---\r\n");
-    // Serial.println((char*)packet.data());
-    // Serial.printf("---\r\n");
-    // 
+    // Serial.printf("\r\n---\r\n"); Serial.println((char*)packet.data()); Serial.printf("---\r\n");
 
     JsonDocument doc;
     if (deserializeJson(doc, packet.data(), packet.length()) != DeserializationError::Ok) {
@@ -401,7 +398,10 @@ void ClientManager::handleAdd(const JsonVariantConst& cmd, IPAddress remoteIp) {
 }
 
 bool ClientManager::Add(const JsonVariantConst& cmd) {
-    if (devConfiguration->Setting["Orchestrator"]["Assigned"].as<bool>()) return false;
+    if (devConfiguration->Setting["Orchestrator"]["Assigned"].as<bool>()){
+        devLog->Write("Orchestrator: Device already assigned to server ID " + devConfiguration->Setting["Orchestrator"]["Server ID"].as<String>(), LOGLEVEL_ERROR);
+        return false;
+    }
 
     IPAddress serverip;
     uint16_t serverport = devConfiguration->Setting["Orchestrator"]["Port"].as<uint16_t>();
@@ -412,28 +412,30 @@ bool ClientManager::Add(const JsonVariantConst& cmd) {
             reply["Provider"] = mManagerName;
             reply["Command"] = "Add";
             reply["Parameter"] = "ACK";
-            reply["Hostname"] = devNetwork->Hostname();
             reply["MAC Address"] = devNetwork->MAC_Address();
+            reply["Hardware Model"] = Version.Hardware.Model;
+            reply["Hostname"] = devNetwork->Hostname();
+            reply["IP Address"] = devNetwork->IP_Address();
+            reply["Local Timestamp"] = devClock->CurrentDateTime();
+            reply["Product Name"] = Version.ProductName;
+            reply["Version"] = Version.Software.Info();
 
             String json;
             serializeJson(reply, json);
             client.print(json);
 
             devLog->Write("Orchestrator: Replied Add command to " + serverip.toString() + ":" + String(serverport), LOGLEVEL_INFO);
+            devConfiguration->Setting["Orchestrator"]["Assigned"] = true;
+            devConfiguration->Setting["Orchestrator"]["Server ID"] = cmd["Server ID"];
+            devConfiguration->Critical();
+
+            devLog->Write("Orchestrator: Added assignment to server ID " + devConfiguration->Setting["Orchestrator"]["Server ID"].as<String>(), LOGLEVEL_INFO);
         });
-    } else {
-        devLog->Write("Orchestrator: Error sending Add ACK to " + devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>()+ ":" + String(serverport), LOGLEVEL_ERROR);
+        return true;
     }
     
-    // String oldServer = devConfiguration->Setting["Orchestrator"]["Server ID"].as<String>();
-
-    // devConfiguration->Setting["Orchestrator"]["Assigned"] = false;
-    // devConfiguration->Setting["Orchestrator"]["Server ID"] = "";
-    // devConfiguration->Critical();
-
-    devLog->Write("Orchestrator: Added assignment to server ID " + devConfiguration->Setting["Orchestrator"]["Server ID"].as<String>(), LOGLEVEL_INFO);
-
-    return true;
+    devLog->Write("Orchestrator: Error sending Add ACK to " + devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>()+ ":" + String(serverport), LOGLEVEL_ERROR);
+    return false;
 }
 
 bool ClientManager::Remove(const JsonVariantConst& cmd) {
@@ -456,20 +458,20 @@ bool ClientManager::Remove(const JsonVariantConst& cmd) {
             client.print(json);
 
             devLog->Write("Orchestrator: Replied Remove command to " + serverip.toString() + ":" + String(serverport), LOGLEVEL_INFO);
+
+            String oldServer = devConfiguration->Setting["Orchestrator"]["Server ID"].as<String>();
+
+            devConfiguration->Setting["Orchestrator"]["Assigned"] = false;
+            devConfiguration->Setting["Orchestrator"]["Server ID"] = "";
+            devConfiguration->Critical();
+
+            devLog->Write("Orchestrator: Removed assignment to server ID " + oldServer, LOGLEVEL_INFO);
         });
-    } else {
-        devLog->Write("Orchestrator: Error sending Remove ACK to " + devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>()+ ":" + String(serverport), LOGLEVEL_ERROR);
+        return true;
     }
     
-    String oldServer = devConfiguration->Setting["Orchestrator"]["Server ID"].as<String>();
-
-    devConfiguration->Setting["Orchestrator"]["Assigned"] = false;
-    devConfiguration->Setting["Orchestrator"]["Server ID"] = "";
-    devConfiguration->Critical();
-
-    devLog->Write("Orchestrator: Removed assignment to server ID " + oldServer, LOGLEVEL_INFO);
-
-    return true;
+    devLog->Write("Orchestrator: Error sending Remove ACK to " + devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>()+ ":" + String(serverport), LOGLEVEL_ERROR);
+    return false;
 }
 
 bool ClientManager::Restart(const JsonVariantConst& cmd) {
@@ -529,14 +531,14 @@ bool ClientManager::Update(const JsonVariantConst& cmd) {
             client.print(json);
 
             devLog->Write("Orchestrator: Replied Update command to " + serverip.toString() + ":" + String(serverport), LOGLEVEL_INFO);
+            g_cmdCheckNow = true;
+
+            return true;
         });
-    } else {
-        devLog->Write("Orchestrator: Error sending Update ACK to " + devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>()+ ":" + String(serverport), LOGLEVEL_ERROR);
     }
     
-    g_cmdCheckNow = true;
-
-    return true;
+    devLog->Write("Orchestrator: Error sending Update ACK to " + devConfiguration->Setting["Orchestrator"]["IP Address"].as<String>()+ ":" + String(serverport), LOGLEVEL_ERROR);
+    return false;
 }
 
 bool ClientManager::connectAndExchangeJson(IPAddress remoteIp, uint16_t port, std::function<void(WiFiClient&)> exchange) {
