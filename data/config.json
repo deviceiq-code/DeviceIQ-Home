@@ -13,7 +13,7 @@
     },
     "MQTT": {
         "Broker": "192.168.1.251",
-        "Enabled": true,
+        "Enable": true,
         "Password": "deviceiq",
         "Port": 1883,
         "User": "deviceiq"
@@ -61,10 +61,10 @@
         "Auto Reboot": true,
         "Check Interval": 172800000,
         "Debug": false,
-        "Update Manifest": "https://server.dts-network.com:8081/update-home.json"
+        "Update Manifest": "https://server.dts-network.com:8081/update.json"
     },
     "Webhooks": {
-        "Enabled": true,
+        "Enable": true,
         "Port": 80,
         "Token": "token_test"
     }

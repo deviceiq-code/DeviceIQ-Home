@@ -92,7 +92,7 @@ void setup() {
 
     if (devConfiguration->Get<String>("Network|Hostname").isEmpty()) {
         devConfiguration->Set("Network|Hostname", Defaults.Network.Hostname(), DeviceIQ_Configuration::SaveUrgency::Critical);
-        devLog->Write("Network: Hostname not set. Configuring new hostname as " + devConfiguration->Get<String>("Network|Hostname"), LOGLEVEL_WARNING);
+        devLog->Write("Network: Hostname not set. Configuring new hostname as " + Defaults.Network.Hostname(), LOGLEVEL_WARNING);
     }
 
     devNetwork->Hostname(devConfiguration->Get("Network|Hostname"));
@@ -263,7 +263,7 @@ void setup() {
             } break;
         }
 
-        NewComponent->Enabled(devConfiguration->GetAt<bool>("Components", objs, "Enabled", Defaults.Components.Enable));
+        NewComponent->Enabled(devConfiguration->GetAt<bool>("Components", objs, "Enable", Defaults.Components.Enable));
 
         // Components Events
         if (NewComponent) {
@@ -615,6 +615,8 @@ void setup() {
                 devLog->Write("Network: Networking is Offline", LOGLEVEL_INFO);
             } break;
         }
+
+
 
         if (devConfiguration->Get<bool>("Update|Check On Boot", Defaults.Update.CheckOnBoot)) devUpdateClient->CheckUpdateNow();
     });

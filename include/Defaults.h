@@ -11,7 +11,7 @@ struct defaults {
     
     struct log {
         const char LogFileName[254] = "/config.log";
-        const Endpoints EndPoint = ENDPOINT_FILE;
+        const Endpoints EndPoint = ENDPOINT_SERIAL;
         const LogLevels LogLevel = LOGLEVEL_ALL;
         const char SyslogServerHost[254] = "";
         const uint16_t SyslogServerPort = 514;
