@@ -22,6 +22,8 @@ struct defaults {
         const char IP_Address[16] = "192.168.4.1";
         const char Gateway[16] = "192.168.4.1";
         const char Netmask[16] = "255.255.255.0";
+        const char SSID[31] = "IOT-2";
+        const char Passphrase[31] = "1921682GenesisIOT-2";
         String Hostname() const { uint8_t mac[6]; esp_read_mac(mac, ESP_MAC_WIFI_STA); char buf[12]; snprintf(buf, sizeof(buf), "DEV-%02X%02X%02X", mac[3], mac[4], mac[5]); return String(buf); }
         const uint16_t ConnectionTimeout = 15;
         const bool OnlineChecking = true;

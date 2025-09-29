@@ -55,17 +55,5 @@
                 "Password": "user"
             }
         ]
-    },
-    "Update": {
-        "Allow Insecure": true,
-        "Auto Reboot": true,
-        "Check Interval": 172800000,
-        "Debug": false,
-        "Update Manifest": "https://server.dts-network.com:8081/update.json"
-    },
-    "Webhooks": {
-        "Enable": true,
-        "Port": 80,
-        "Token": "token_test"
     }
 }

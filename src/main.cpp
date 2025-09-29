@@ -51,6 +51,8 @@ Collection devCollection;
 volatile bool g_cmdCheckNow = false;
 
 void setup() {
+    Serial.begin(115200);
+
     // General Settings
     esp_log_level_set("*", ESP_LOG_NONE);
 
@@ -59,8 +61,8 @@ void setup() {
 
     // Configuration
     devConfiguration = new Configuration(devFileSystem);
-    while (!devConfiguration->LoadConfigurationFile(Defaults.ConfigFileName)) {
-        if (!devConfiguration->ResetToDefaultSettings()) while (1);
+    if (!devConfiguration->LoadConfigurationFile(Defaults.ConfigFileName)) {
+        //if (!devConfiguration->ResetToDefaultSettings()) while (1);
     }
 
     // Clock
@@ -81,6 +83,8 @@ void setup() {
     // MQTT
     devMQTT = new MQTT();
 
+    serializeJsonPretty(devConfiguration->Setting, Serial);
+
     // Network
     devNetwork = new Network();
     devNetwork->DHCP_Client(devConfiguration->Get<bool>("Network|DHCP Client", Defaults.Network.DHCP_Client));
@@ -91,25 +95,25 @@ void setup() {
     }
 
     if (devConfiguration->Get<String>("Network|Hostname").isEmpty()) {
-        devConfiguration->Set("Network|Hostname", Defaults.Network.Hostname(), DeviceIQ_Configuration::SaveUrgency::Critical);
+        devConfiguration->Set<String>("Network|Hostname", Defaults.Network.Hostname(), DeviceIQ_Configuration::SaveUrgency::Critical);
         devLog->Write("Network: Hostname not set. Configuring new hostname as " + Defaults.Network.Hostname(), LOGLEVEL_WARNING);
     }
 
     devNetwork->Hostname(devConfiguration->Get("Network|Hostname"));
-    devNetwork->SSID(devConfiguration->Get("Network|SSID"));
-    devNetwork->Passphrase(devConfiguration->Get("Network|Passphrase"));
+    devNetwork->SSID(devConfiguration->Get("Network|SSID", Defaults.Network.SSID));
+    devNetwork->Passphrase(devConfiguration->Get("Network|Passphrase", Defaults.Network.Passphrase));
     devNetwork->ConnectionTimeout(devConfiguration->Get<uint16_t>("Network|Connection Timeout", Defaults.Network.ConnectionTimeout));
     devNetwork->OnlineChecking(devConfiguration->Get<bool>("Network|Online Checking", Defaults.Network.OnlineChecking));
     devNetwork->OnlineCheckingTimeout(devConfiguration->Get<uint16_t>("Network|Online Checking Timeout", Defaults.Network.OnlineCheckingTimeout));
 
-    devConfiguration->Set("Network|MAC Address", devNetwork->MAC_Address());
+    devConfiguration->Set<String>("Network|MAC Address", devNetwork->MAC_Address());
 
     // Update
     devUpdateClient = new UpdateClient([&]{
         DeviceIQ_Update::UpdateConfig c;
         c.model = Version.ProductName;
         c.currentVersion = Version.Software.Info();
-        c.manifestUrl = devConfiguration->Get("Update|Update Manifest", Defaults.Update.ManifestURL);
+        c.manifestUrl = devConfiguration->Get<String>("Update|Update Manifest", Defaults.Update.ManifestURL);
         c.rootCA_PEM = nullptr;
         c.allowInsecure = devConfiguration->Get<bool>("Update|Allow Insecure", Defaults.Update.AllowInsecure);
         // c.enableLanOta = true;
@@ -123,6 +127,9 @@ void setup() {
 
         return c;
     }());
+
+    // Parei aqui - o Set nao ta salvando
+    devConfiguration->Set<String>("Update|Update Manifest", Defaults.Update.ManifestURL, SaveUrgency::Critical);
 
     devUpdateClient->OnError([&](DeviceIQ_Update::Error e, const String& d) {
         if (devConfiguration->Get<bool>("Update|Debug", Defaults.Update.Debug)) devLog->Write("Update Client: Error [" + String((int)e) + "] Detail [" + d + "]", LOGLEVEL_INFO);
@@ -616,9 +623,9 @@ void setup() {
             } break;
         }
 
-
-
         if (devConfiguration->Get<bool>("Update|Check On Boot", Defaults.Update.CheckOnBoot)) devUpdateClient->CheckUpdateNow();
+
+
     });
     devNetwork->Connect();
 }
