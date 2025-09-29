@@ -59,7 +59,7 @@ void setup() {
 
     // Configuration
     devConfiguration = new Configuration(devFileSystem);
-    while (!devConfiguration->LoadConfigurationFile("/config.json")) {
+    while (!devConfiguration->LoadConfigurationFile(Defaults.ConfigFileName)) {
         if (!devConfiguration->ResetToDefaultSettings()) while (1);
     }
 
@@ -69,12 +69,13 @@ void setup() {
 
     // Log
     devLog = new Log(devFileSystem, devClock);
-    devLog->Endpoint(devConfiguration->Setting["Log"]["Endpoint"].as<Endpoints>());
-    devLog->LogFile("/syslog.log");
-    devLog->Level(devConfiguration->Setting["Log"]["Level"].as<LogLevels>());
     devLog->SerialPort(&Serial);
-    devLog->SyslogServerURL(devConfiguration->Setting["Log"]["Syslog Server"].as<String>());
-    devLog->SyslogServerPort(devConfiguration->Setting["Log"]["Syslog Port"].as<uint16_t>());
+    devLog->LogFileName(Defaults.Log.LogFileName);
+    devLog->Endpoint(devConfiguration->Get<Endpoints>("Log|Endpoint", Defaults.Log.EndPoint));
+    devLog->LogLevel(devConfiguration->Get<LogLevels>("Log|Level", Defaults.Log.LogLevel));
+    devLog->SyslogServerHost(devConfiguration->Get("Log|Syslog Server Host", Defaults.Log.SyslogServerHost));
+    devLog->SyslogServerPort(devConfiguration->Get<uint16_t>("Log|Syslog Port", Defaults.Log.SyslogServerPort));
+
     devLog->Write(Version.ProductFamily + " " + Version.Software.Info(), LOGLEVEL_INFO);
 
     // MQTT
@@ -82,52 +83,49 @@ void setup() {
 
     // Network
     devNetwork = new Network();
-    devNetwork->DHCP_Client(devConfiguration->Setting["Network"]["DHCP Client"].as<bool>());
+    devNetwork->DHCP_Client(devConfiguration->Get<bool>("Network|DHCP Client", Defaults.Network.DHCP_Client));
     if (!devNetwork->DHCP_Client()) {
-        devNetwork->IP_Address(devConfiguration->Setting["Network"]["IP Address"].as<String>());
-        devNetwork->Gateway(devConfiguration->Setting["Network"]["Gateway"].as<String>());
-        devNetwork->Netmask(devConfiguration->Setting["Network"]["Netmask"].as<String>());
+        devNetwork->IP_Address(devConfiguration->Get("Network|IP Address", Defaults.Network.IP_Address));
+        devNetwork->Gateway(devConfiguration->Get("Network|Gateway", Defaults.Network.Gateway));
+        devNetwork->Netmask(devConfiguration->Get("Network|Netmask", Defaults.Network.Netmask));
     }
 
-    if (devConfiguration->Setting["Network"]["Hostname"].as<String>().isEmpty()) {
-        String tmp_Hostname = String("DEVIQ-" + devNetwork->MAC_Address().substring(devNetwork->MAC_Address().length() - 8, devNetwork->MAC_Address().length()));
-        tmp_Hostname.toUpperCase(); tmp_Hostname.replace(":", "");
-        devConfiguration->Setting["Network"]["Hostname"] = tmp_Hostname;
-        devConfiguration->Outdated();
-        devLog->Write("Network: Hostname not set. Configuring new hostname as " + tmp_Hostname, LOGLEVEL_WARNING);
+    if (devConfiguration->Get<String>("Network|Hostname").isEmpty()) {
+        devConfiguration->Set("Network|Hostname", Defaults.Network.Hostname(), DeviceIQ_Configuration::SaveUrgency::Critical);
+        devLog->Write("Network: Hostname not set. Configuring new hostname as " + devConfiguration->Get<String>("Network|Hostname"), LOGLEVEL_WARNING);
     }
 
-    devNetwork->Hostname(devConfiguration->Setting["Network"]["Hostname"].as<String>());
-    devNetwork->SSID(devConfiguration->Setting["Network"]["SSID"].as<String>());
-    devNetwork->Passphrase(devConfiguration->Setting["Network"]["Passphrase"].as<String>());
-    devNetwork->ConnectionTimeout(devConfiguration->Setting["Network"]["Connection Timeout"].as<uint16_t>());
-    devNetwork->OnlineChecking(devConfiguration->Setting["Network"]["Online Checking"].as<bool>());
-    devNetwork->OnlineCheckingMinutes(devConfiguration->Setting["Network"]["Online Checking Minutes"].as<uint16_t>());
+    devNetwork->Hostname(devConfiguration->Get("Network|Hostname"));
+    devNetwork->SSID(devConfiguration->Get("Network|SSID"));
+    devNetwork->Passphrase(devConfiguration->Get("Network|Passphrase"));
+    devNetwork->ConnectionTimeout(devConfiguration->Get<uint16_t>("Network|Connection Timeout", Defaults.Network.ConnectionTimeout));
+    devNetwork->OnlineChecking(devConfiguration->Get<bool>("Network|Online Checking", Defaults.Network.OnlineChecking));
+    devNetwork->OnlineCheckingTimeout(devConfiguration->Get<uint16_t>("Network|Online Checking Timeout", Defaults.Network.OnlineCheckingTimeout));
 
-    devConfiguration->Setting["Network"]["MAC Address"] = devNetwork->MAC_Address();
+    devConfiguration->Set("Network|MAC Address", devNetwork->MAC_Address());
 
     // Update
     devUpdateClient = new UpdateClient([&]{
         DeviceIQ_Update::UpdateConfig c;
         c.model = Version.ProductName;
         c.currentVersion = Version.Software.Info();
-        c.manifestUrl = String(devConfiguration->Setting["Update"]["Update Manifest"] | Defaults.Update.ManifestURL);
+        c.manifestUrl = devConfiguration->Get("Update|Update Manifest", Defaults.Update.ManifestURL);
         c.rootCA_PEM = nullptr;
-        c.allowInsecure = devConfiguration->Setting["Update"]["Allow Insecure"] | Defaults.Update.AllowInsecure;
+        c.allowInsecure = devConfiguration->Get<bool>("Update|Allow Insecure", Defaults.Update.AllowInsecure);
         // c.enableLanOta = true;
 
         c.lanHostname = devNetwork->Hostname();
         c.lanPassword = "";
-        c.checkIntervalMs = devConfiguration->Setting["Update"]["Check Interval"] | Defaults.Update.CheckUpdateIntervalMs;
-        c.httpTimeoutMs = 15000u;
+        c.checkInterval = devConfiguration->Get<uint32_t>("Update|Check Interval", Defaults.Update.CheckUpdateInterval);
+        c.httpTimeout = 15;
         c.streamBufSize = size_t(4096);
-        c.autoReboot = devConfiguration->Setting["Update"]["Auto Reboot"] | Defaults.Update.AutoReboot;
+        c.autoReboot = devConfiguration->Get<bool>("Update|Auto Reboot", Defaults.Update.AutoReboot);
 
         return c;
     }());
 
     devUpdateClient->OnError([&](DeviceIQ_Update::Error e, const String& d) {
-        if (devConfiguration->Setting["Update"]["Debug"] | Defaults.Update.Debug) devLog->Write("Update Client: Error [" + String((int)e) + "] Detail [" + d + "]", LOGLEVEL_INFO);
+        if (devConfiguration->Get<bool>("Update|Debug", Defaults.Update.Debug)) devLog->Write("Update Client: Error [" + String((int)e) + "] Detail [" + d + "]", LOGLEVEL_INFO);
     });
 
     devUpdateClient->OnEvent([&](DeviceIQ_Update::Event e) {
@@ -141,34 +139,33 @@ void setup() {
                 devLog->Write("Update Client: New version " + v + " available (MIN " + min + ", FORCED " + (forced ? "Yes" : "No") + ")", forced ? LOGLEVEL_WARNING : LOGLEVEL_INFO);
             } break;
             case Event::Downloading: {
-                if (devConfiguration->Setting["Update"]["Debug"] |  Defaults.Update.Debug) devLog->Write("Update Client: Downloading " + url, LOGLEVEL_INFO);
+                if (devConfiguration->Get<bool>("Update|Debug", Defaults.Update.Debug)) devLog->Write("Update Client: Downloading " + url, LOGLEVEL_INFO);
             } break;
             case Event::Verifying: {
-                if (devConfiguration->Setting["Update"]["Debug"] | Defaults.Update.Debug) devLog->Write("Update Client: Verifying new firmware integrity", LOGLEVEL_INFO);
+                if (devConfiguration->Get<bool>("Update|Debug", Defaults.Update.Debug)) devLog->Write("Update Client: Verifying new firmware integrity", LOGLEVEL_INFO);
             } break;
             case Event::Applying: {
-                if (devConfiguration->Setting["Update"]["Debug"] | Defaults.Update.Debug) devLog->Write("Update Client: Applying update", LOGLEVEL_INFO);
+                if (devConfiguration->Get<bool>("Update|Debug", Defaults.Update.Debug)) devLog->Write("Update Client: Applying update", LOGLEVEL_INFO);
             } break;
             case Event::Rebooting: {
-                if (devConfiguration->Setting["Update"]["Debug"] | Defaults.Update.Debug) devLog->Write("Update Client: Rebooting to apply update", LOGLEVEL_WARNING);
+                if (devConfiguration->Get<bool>("Update|Debug", Defaults.Update.Debug)) devLog->Write("Update Client: Rebooting to apply update", LOGLEVEL_WARNING);
             } break;
             default: break;
         }
     });
 
     // Components
-    for (uint16_t objs = 0; objs < devConfiguration->Setting["Components"].size(); objs++) {
+    for (uint16_t objs = 0; objs < devConfiguration->Elements("Components"); objs++) {
         Classes NewComponent_Class;
-        if (AvailableComponentClasses.find(devConfiguration->Setting["Components"][objs]["Class"].as<String>()) != AvailableComponentClasses.end()) {
-            NewComponent_Class = AvailableComponentClasses.at(devConfiguration->Setting["Components"][objs]["Class"].as<String>());
-        }
-
         Buses NewComponent_Bus;
-        if (AvailableComponentBuses.find(devConfiguration->Setting["Components"][objs]["Bus"].as<String>()) != AvailableComponentBuses.end()) {
-            NewComponent_Bus = AvailableComponentBuses.at(devConfiguration->Setting["Components"][objs]["Bus"].as<String>());
-        }
+        uint8_t NewComponent_BusAddress = devConfiguration->GetAt<uint8_t>("Components", objs, "Address");
 
-        uint8_t NewComponent_BusAddress = devConfiguration->Setting["Components"][objs]["Address"].as<uint8_t>();
+        String tmp_Class = devConfiguration->GetAt<String>("Components", objs, "Class");
+        String tmp_Bus = devConfiguration->GetAt<String>("Components", objs, "Bus");
+
+
+        if (AvailableComponentClasses.find(tmp_Class) != AvailableComponentClasses.end()) NewComponent_Class = AvailableComponentClasses.at(tmp_Class);
+        if (AvailableComponentBuses.find(tmp_Bus) != AvailableComponentBuses.end()) NewComponent_Bus = AvailableComponentBuses.at(tmp_Bus);
 
         Generic *NewComponent = nullptr;
 
@@ -178,20 +175,14 @@ void setup() {
             } break;
 
             case CLASS_BLINDS: {
-                int16_t relayUpIndex = devCollection.IndexOf(devConfiguration->Setting["Components"][objs]["Relay Up"].as<String>());
-                int16_t relayDnIndex = devCollection.IndexOf(devConfiguration->Setting["Components"][objs]["Relay Down"].as<String>());
+                int16_t relayUpIndex = devCollection.IndexOf(devConfiguration->GetAt<String>("Components", objs, "Relay Up"));
+                int16_t relayDnIndex = devCollection.IndexOf(devConfiguration->GetAt<String>("Components", objs, "Relay Down"));
 
                 if (relayUpIndex > -1 && relayDnIndex > -1) {
-                    NewComponent = new Blinds(
-                        devConfiguration->Setting["Components"][objs]["Name"].as<String>(),
-                        objs,
-                        devCollection.At(relayUpIndex)->as<Relay>(),
-                        devCollection.At(relayDnIndex)->as<Relay>()
-                    );
-
-                    NewComponent->as<Blinds>()->Position(devConfiguration->Setting["Components"][objs]["Position"].as<uint8_t>(), true);
+                    NewComponent = new Blinds(devConfiguration->GetAt<String>("Components", objs, "Name"), objs, devCollection.At(relayUpIndex)->as<Relay>(), devCollection.At(relayDnIndex)->as<Relay>());
+                    NewComponent->as<Blinds>()->Position(devConfiguration->GetAt<uint8_t>("Components", objs, "Position"), true);
                 } else {
-                    devLog->Write("Blinds '" + devConfiguration->Setting["Components"][objs]["Name"].as<String>() + "' not created: relay up/down not found", LOGLEVEL_ERROR);
+                    devLog->Write("Blinds '" + devConfiguration->GetAt<String>("Components", objs, "Name") + "' not created: relay up/down not found", LOGLEVEL_ERROR);
                 }
 
                 auto* n = NewComponent->as<Blinds>();
@@ -202,124 +193,81 @@ void setup() {
             } break;
 
             case CLASS_BUTTON: {
-                NewComponent = new Button(devConfiguration->Setting["Components"][objs]["Name"].as<String>(), objs, NewComponent_Bus, NewComponent_BusAddress, (devConfiguration->Setting["Components"][objs]["Report"].as<String>().equalsIgnoreCase("EdgesOnly") ? ButtonReportModes::BUTTONREPORTMODE_EDGESONLY : ButtonReportModes::BUTTONREPORTMODE_CLICKSONLY));
+                NewComponent = new Button(devConfiguration->GetAt<String>("Components", objs, "Name"), objs, NewComponent_Bus, NewComponent_BusAddress, (devConfiguration->GetAt<String>("Components", objs, "Report").equalsIgnoreCase("EdgesOnly") ? ButtonReportModes::BUTTONREPORTMODE_EDGESONLY : ButtonReportModes::BUTTONREPORTMODE_CLICKSONLY));
 
                 auto* n = NewComponent->as<Button>();
                 if (n->ReportMode() == ButtonReportModes::BUTTONREPORTMODE_CLICKSONLY) {
-                    n->Event["Click ed"]([n, objs] {
-                        if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Button:" + n->Name(), "Clicked");
-                    });
-                    n->Event["DoubleClicked"]([n, objs] {
-                        if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Button:" + n->Name(), "DoubleClicked");
-                    });
-                    n->Event["TripleClicked"]([n, objs] {
-                        if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Button:" + n->Name(), "TripleClicked");
-                    });
-                    n->Event["LongClicked"]([n, objs] {
-                        if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Button:" + n->Name(), "LongClicked");
-                    });
+                    n->Event["Clicked"]([n, objs] { if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Button:" + n->Name(), "Clicked"); });
+                    n->Event["DoubleClicked"]([n, objs] { if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Button:" + n->Name(), "DoubleClicked"); });
+                    n->Event["TripleClicked"]([n, objs] { if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Button:" + n->Name(), "TripleClicked"); });
+                    n->Event["LongClicked"]([n, objs] { if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Button:" + n->Name(), "LongClicked"); });
                 } else if (n->ReportMode() == ButtonReportModes::BUTTONREPORTMODE_EDGESONLY) {
-                    n->Event["Pressed"]([n, objs] {
-                        if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Button:" + n->Name(), "Pressed");
-                    });
-                    n->Event["Released"]([n, objs] {
-                        if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Button:" + n->Name(), "Released");
-                    });
+                    n->Event["Pressed"]([n, objs] { if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Button:" + n->Name(), "Pressed"); });
+                    n->Event["Released"]([n, objs] { if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Button:" + n->Name(), "Released"); });
                 }
             } break;
 
             case CLASS_CURRENTMETER: {
-                NewComponent = new Currentmeter(devConfiguration->Setting["Components"][objs]["Name"].as<String>(), objs, NewComponent_Bus, NewComponent_BusAddress);
+                NewComponent = new Currentmeter(devConfiguration->GetAt<String>("Components", objs, "Name"), objs, NewComponent_Bus, NewComponent_BusAddress);
 
                 auto* n = NewComponent->as<Currentmeter>();
-                n->Event["Changed"]([n, objs] {
-                    if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Currentmeter:" + n->Name() + ":DC", String(n->CurrentDC()));
-                    if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Currentmeter:" + n->Name() + ":AC", String(n->CurrentAC()));
-                });
+                n->Event["Changed"]([n, objs] { if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Currentmeter:" + n->Name() + ":DC", String(n->CurrentDC())); if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Currentmeter:" + n->Name() + ":AC", String(n->CurrentAC())); });
             } break;
 
             case CLASS_RELAY: {
-                NewComponent = new Relay(devConfiguration->Setting["Components"][objs]["Name"].as<String>(), objs, NewComponent_Bus, NewComponent_BusAddress, DeviceIQ_Components::RelayTypes::RELAYTYPE_NORMALLYCLOSED);
+                NewComponent = new Relay(devConfiguration->GetAt<String>("Components", objs, "Name"), objs, NewComponent_Bus, NewComponent_BusAddress, DeviceIQ_Components::RelayTypes::RELAYTYPE_NORMALLYCLOSED);
 
                 auto* n = NewComponent->as<Relay>();
-                n->State(devConfiguration->Setting["Components"][objs]["State"].as<bool>());
+                n->State(devConfiguration->GetAt<bool>("Components", objs, "State"));
 
-                n->Event["Changed"]([n, objs] {
-                    if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Relay:" + n->Name(), n->State() ? "on" : "off");
-                    devConfiguration->Setting["Components"][objs]["State"] = n->State();
-                    devConfiguration->Outdated();
-                });
+                n->Event["Changed"]([n, objs] { if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Relay:" + n->Name(), n->State() ? "on" : "off"); devConfiguration->SetAt("Components", objs, "State", n->State()); });
             } break;
 
             case CLASS_PIR: {
-                NewComponent = new PIR(devConfiguration->Setting["Components"][objs]["Name"].as<String>(), objs, NewComponent_Bus, NewComponent_BusAddress);
+                NewComponent = new PIR(devConfiguration->GetAt<String>("Components", objs, "Name"), objs, NewComponent_Bus, NewComponent_BusAddress);
 
                 auto* n = NewComponent->as<PIR>();
-                n->DebounceTime(devConfiguration->Setting["Components"][objs]["Debounce"].as<uint32_t>());
+                n->DebounceTime(devConfiguration->GetAt<uint32_t>("Components", objs, "Debounce"));
 
-                n->Event["MotionDetected"]([n, objs] {
-                    if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/PIR:" + n->Name(), "M");
-                });
-                
-                n->Event["MotionCleared"]([n, objs] {
-                    if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/PIR:" + n->Name(), "C");
-                });
+                n->Event["MotionDetected"]([n, objs] { if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/PIR:" + n->Name(), "M"); });
+                n->Event["MotionCleared"]([n, objs] { if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/PIR:" + n->Name(), "C"); });
             } break;
 
             case CLASS_DOORBELL: {
-                NewComponent = new Doorbell(devConfiguration->Setting["Components"][objs]["Name"].as<String>(), objs, NewComponent_Bus, NewComponent_BusAddress);
+                NewComponent = new Doorbell(devConfiguration->GetAt<String>("Components", objs, "Name"), objs, NewComponent_Bus, NewComponent_BusAddress);
 
                 auto* n = NewComponent->as<Doorbell>();
-                n->Timeout(devConfiguration->Setting["Components"][objs]["Timeout"].as<uint32_t>());
+                n->Timeout(devConfiguration->GetAt<uint32_t>("Components", objs, "Timeout"));
 
-                n->Event["Ring"]([n, objs] {
-                    if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Doorbell:" + n->Name(), "1");
-                });
-                n->Event["DoubleRing"]([n, objs] {
-                    if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Doorbell:" + n->Name(), "2");
-                });
-                n->Event["LongRing"]([n, objs] {
-                    if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Doorbell:" + n->Name(), "L");
-                });
+                n->Event["Ring"]([n, objs] { if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Doorbell:" + n->Name(), "1"); });
+                n->Event["DoubleRing"]([n, objs] { if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Doorbell:" + n->Name(), "2"); });
+                n->Event["LongRing"]([n, objs] { if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Doorbell:" + n->Name(), "L"); });
             } break;
 
             case CLASS_CONTACTSENSOR: {
-                NewComponent = new ContactSensor(devConfiguration->Setting["Components"][objs]["Name"].as<String>(), objs, NewComponent_Bus, NewComponent_BusAddress, devConfiguration->Setting["Components"][objs]["InvertClose"].as<bool>());
+                NewComponent = new ContactSensor(devConfiguration->GetAt<String>("Components", objs, "Name"), objs, NewComponent_Bus, NewComponent_BusAddress, devConfiguration->GetAt<bool>("Components", objs, "InvertClose"));
 
                 auto* n = NewComponent->as<ContactSensor>();
-                n->Event["Opened"]([n, objs] {
-                    if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/ContactSensor:" + n->Name(), "Opened");
-                });
-                n->Event["Closed"]([n, objs] {
-                    if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/ContactSensor:" + n->Name(), "Closed");
-                });
+                n->Event["Opened"]([n, objs] { if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/ContactSensor:" + n->Name(), "Opened"); });
+                n->Event["Closed"]([n, objs] { if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/ContactSensor:" + n->Name(), "Closed"); });
             } break;
 
             case CLASS_THERMOMETER: {
-                auto it = AvailableThermometerTypes.find(devConfiguration->Setting["Components"][objs]["Type"].as<String>());
-                if (it != AvailableThermometerTypes.end()) {
-                    NewComponent = new Thermometer(devConfiguration->Setting["Components"][objs]["Name"].as<String>(), objs, NewComponent_Bus, NewComponent_BusAddress, it->second);
-                }
+                auto it = AvailableThermometerTypes.find(devConfiguration->GetAt<String>("Components", objs, "Type"));
+                if (it != AvailableThermometerTypes.end()) NewComponent = new Thermometer(devConfiguration->GetAt<String>("Components", objs, "Name"), objs, NewComponent_Bus, NewComponent_BusAddress, it->second);
 
                 auto* n = NewComponent->as<Thermometer>();
-                n->Event["TemperatureChanged"]([n, objs] {
-                    if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Thermometer:" + n->Name() + ":Temperature", String(n->Temperature()));
-                });
-                n->Event["HumidityChanged"]([n, objs] {
-                    if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Thermometer:" + n->Name() + ":Humidity", String(n->Humidity()));
-                });
-                n->Event["Changed"]([n, objs] {
-                    if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Thermometer:" + n->Name() + ":Temperature", String(n->Temperature()));
-                    if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Thermometer:" + n->Name() + ":Humidity", String(n->Humidity()));
-                });
+                n->Event["TemperatureChanged"]([n, objs] { if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Thermometer:" + n->Name() + ":Temperature", String(n->Temperature())); });
+                n->Event["HumidityChanged"]([n, objs] { if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Thermometer:" + n->Name() + ":Humidity", String(n->Humidity())); });
+                n->Event["Changed"]([n, objs] { if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Thermometer:" + n->Name() + ":Temperature", String(n->Temperature())); if (devMQTT) devMQTT->Publish(devNetwork->Hostname() + "/Get/Thermometer:" + n->Name() + ":Humidity", String(n->Humidity())); });
             } break;
         }
 
-        NewComponent->Enabled(devConfiguration->Setting["Components"][objs]["Enabled"] | true);
+        NewComponent->Enabled(devConfiguration->GetAt<bool>("Components", objs, "Enabled", Defaults.Components.Enable));
 
         // Components Events
         if (NewComponent) {
-            JsonObject EventsInConfig = devConfiguration->Setting["Components"][objs]["Events"].as<JsonObject>();
+            JsonObjectConst EventsInConfig = devConfiguration->GetAt<JsonObjectConst>("Components", objs, "Events");
             
             for (auto& ComponentEvent : NewComponent->Event) {
                 const String& eventName = ComponentEvent.first;
@@ -416,11 +364,11 @@ void setup() {
                 devLog->Write("Network: " + devNetwork->Hostname() + " MAC " + devNetwork->MAC_Address() + " connected to " + devNetwork->SSID() + " IP " + devNetwork->IP_Address().toString(), LOGLEVEL_INFO);
 
                 // NTP
-                if (devConfiguration->Setting["General"]["NTP Update"].as<bool>()) {
-                    if (devClock->NTPUpdate(devConfiguration->Setting["General"]["NTP Server"].as<String>())) {
-                        devLog->Write("Date and Time: Updated from NTP server " + devConfiguration->Setting["General"]["NTP Server"].as<String>(), LOGLEVEL_INFO);
+                if (devConfiguration->Get<bool>("General|NTP Update", Defaults.NTP.Update)) {
+                    if (devClock->NTPUpdate(devConfiguration->Get<String>("General|NTP Server", Defaults.NTP.Server))) {
+                        devLog->Write("Date and Time: Updated from NTP server " + devConfiguration->Get<String>("General|NTP Server", Defaults.NTP.Server), LOGLEVEL_INFO);
                     } else {
-                        devLog->Write("Date and Time: Failed to update from NTP server " + devConfiguration->Setting["General"]["NTP Server"].as<String>(), LOGLEVEL_ERROR);
+                        devLog->Write("Date and Time: Failed to update from NTP server " + devConfiguration->Get<String>("General|NTP Server", Defaults.NTP.Server), LOGLEVEL_ERROR);
                     }
                 } else {
                     devLog->Write("Date and Time: Using local settings", LOGLEVEL_INFO);
@@ -428,10 +376,10 @@ void setup() {
 
                 // Orchestrator
                 ClientManager::getInstance().begin();
-                if (devConfiguration->Setting["Orchestrator"]["Assigned"].as<bool>()) {
-                    devLog->Write("Orchestrator: Device assigned to server ID " + devConfiguration->Setting["Orchestrator"]["Server ID"].as<String>(), LOGLEVEL_WARNING);
+                if (devConfiguration->Get<bool>("Orchestrator|Assigned", Defaults.Orchestrator.Assigned) && !devConfiguration->Get<String>("Orchestrator|Server ID").isEmpty()) {
+                    devLog->Write("Orchestrator: Device assigned to server ID " + devConfiguration->Get<String>("Orchestrator|Server ID"), LOGLEVEL_WARNING);
                     JsonDocument cmd;
-                    cmd["Server ID"] = devConfiguration->Setting["Orchestrator"]["Server ID"];
+                    cmd["Server ID"] = devConfiguration->Get<String>("Orchestrator|Server ID");
                     
                     ClientManager::getInstance().Refresh(cmd);
                 } else {
@@ -440,11 +388,11 @@ void setup() {
 
                 // Webhooks/MQTT
                 if (!interfacesRegistered) {
-                    devWebhook = new AsyncWebServer(devConfiguration->Setting["Webhooks"]["Port"].as<uint16_t>());
+                    devWebhook = new AsyncWebServer(devConfiguration->Get<uint16_t>("Webhooks|Port", Defaults.WebHooks.Port));
                     devWebhook->onNotFound([](AsyncWebServerRequest *request) { request->send(404); });
 
                     // Webhooks
-                    if (devConfiguration->Setting["Webhooks"]["Enabled"].as<bool>()) {
+                    if (devConfiguration->Get<bool>("Webhooks|Enable", Defaults.WebHooks.Enable)) {
                         for (auto m : devCollection) {
                             switch (m->Class()) {
 
@@ -453,7 +401,7 @@ void setup() {
                                         JsonDocument reply;
                                         String json;
 
-                                        if (hasValidHeaderToken(request, devConfiguration->Setting["Webhooks"]["Token"].as<String>()) == true) {
+                                        if (hasValidHeaderToken(request, devConfiguration->Get<String>("Webhooks|Token", Defaults.WebHooks.Token())) == true) {
                                             bool setnewvalue = false;
                                             String Arg, Val;
 
@@ -499,62 +447,62 @@ void setup() {
                                 case CLASS_PIR : {
                                     registerEndpoint(devWebhook, m, "PIR", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
                                         reply["Motion"] = comp->as<PIR>()->State();
-                                    }, devConfiguration, devLog);
+                                    }, devConfiguration->Get<String>("Webhooks|Token", Defaults.WebHooks.Token()), devLog);
                                 } break;
 
                                 case CLASS_BUTTON: {
                                     registerEndpoint(devWebhook, m, "Button", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
                                         reply["Pressed"] = comp->as<Button>()->IsPressed();
-                                    }, devConfiguration, devLog);
+                                    }, devConfiguration->Get<String>("Webhooks|Token", Defaults.WebHooks.Token()), devLog);
                                 } break;
 
                                 case CLASS_CURRENTMETER: {
                                     registerEndpoint(devWebhook, m, "Currentmeter", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
                                         reply["Current AC"] = comp->as<Currentmeter>()->CurrentAC();
                                         reply["Current DC"] = comp->as<Currentmeter>()->CurrentDC();
-                                    }, devConfiguration, devLog);
+                                    }, devConfiguration->Get<String>("Webhooks|Token", Defaults.WebHooks.Token()), devLog);
                                 } break;
 
                                 case CLASS_THERMOMETER: {
                                     registerEndpoint(devWebhook, m, "Thermometer", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
                                         reply["Humidity"] = comp->as<Thermometer>()->Humidity();
                                         reply["Temperature"] = comp->as<Thermometer>()->Temperature();
-                                    }, devConfiguration, devLog);
+                                    }, devConfiguration->Get<String>("Webhooks|Token", Defaults.WebHooks.Token()), devLog);
                                 } break;
 
                                 case CLASS_BLINDS: {
                                     registerEndpoint(devWebhook, m, "Blinds", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
                                         reply["Position"] = comp->as<Blinds>()->Position();
                                         reply["State"] = comp->as<Blinds>()->State() == BlindsStates::BLINDSSTATE_DECREASING ? "Decreasing" : (comp->as<Blinds>()->State() == BlindsStates::BLINDSSTATE_INCREASING ? "Increasing" : "Stopped");
-                                    }, devConfiguration, devLog);
+                                    }, devConfiguration->Get<String>("Webhooks|Token", Defaults.WebHooks.Token()), devLog);
                                 } break;
 
                                 case CLASS_DOORBELL: {
                                     registerEndpoint(devWebhook, m, "Doorbell", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
                                         reply["State"] = comp->as<Doorbell>()->State();
-                                    }, devConfiguration, devLog);
+                                    }, devConfiguration->Get<String>("Webhooks|Token", Defaults.WebHooks.Token()), devLog);
                                 } break;
 
                                 case CLASS_CONTACTSENSOR: {
                                     registerEndpoint(devWebhook, m, "ContactSensor", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
                                         reply["State"] = comp->as<ContactSensor>()->State();
-                                    }, devConfiguration, devLog);
+                                    }, devConfiguration->Get<String>("Webhooks|Token", Defaults.WebHooks.Token()), devLog);
                                 } break;
                             }
                         }
 
                         devWebhook->begin();
-                        devLog->Write("Webhooks: Enabled on port " + devConfiguration->Setting["Webhooks"]["Port"].as<String>(), LOGLEVEL_INFO);
+                        devLog->Write("Webhooks: Enabled on port " + String(devConfiguration->Get<uint16_t>("Webhooks|Port", Defaults.WebHooks.Port)), LOGLEVEL_INFO);
                     } else {
                         devLog->Write("Webhooks: Disabled", LOGLEVEL_INFO);
                     }
 
                     // MQTT
-                    if (devConfiguration->Setting["MQTT"]["Enabled"].as<bool>()) {
-                        devMQTT->Broker(devConfiguration->Setting["MQTT"]["Broker"].as<String>());
-                        devMQTT->Port(devConfiguration->Setting["MQTT"]["Port"].as<uint16_t>());
-                        devMQTT->User(devConfiguration->Setting["MQTT"]["User"].as<String>());
-                        devMQTT->Password(devConfiguration->Setting["MQTT"]["Password"].as<String>());
+                    if (devConfiguration->Get<bool>("MQTT|Enable", Defaults.MQTT.Enable)) {
+                        devMQTT->Broker(devConfiguration->Get("MQTT|Broker", Defaults.MQTT.Broker));
+                        devMQTT->Port(devConfiguration->Get<uint16_t>("MQTT|Port", Defaults.MQTT.Port));
+                        devMQTT->User(devConfiguration->Get("MQTT|User", Defaults.MQTT.User));
+                        devMQTT->Password(devConfiguration->Get("MQTT|Password", Defaults.MQTT.Password));
 
                         devMQTT->Subscribe(devNetwork->Hostname() + "/Set/#", [&](const String& topic, const String& payload) {
                             const String prefixSet = devNetwork->Hostname() + "/Set/";
@@ -668,7 +616,7 @@ void setup() {
             } break;
         }
 
-        if (devConfiguration->Setting["Update"]["Check On Boot"] | Defaults.Update.CheckOnBoot) devUpdateClient->CheckUpdateNow();
+        if (devConfiguration->Get<bool>("Update|Check On Boot", Defaults.Update.CheckOnBoot)) devUpdateClient->CheckUpdateNow();
     });
     devNetwork->Connect();
 }

@@ -15,6 +15,9 @@ using namespace DeviceIQ_Configuration;
 
 #define CHECK_BIT(var, pos) ((var) & (1 << (pos - 1)))
 
+inline bool IsEmpty(const char* s) { return (!s || *s == '\0'); }
+inline void BuildDefaultHostname(char* out, size_t outSize) { if (!out || outSize == 0) return; uint8_t mac[6]; esp_read_mac(mac, ESP_MAC_WIFI_STA); snprintf(out, outSize, "DEV-%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]); }
+
 class SString : public String {
     public:
         SString() : String() {}
@@ -35,12 +38,12 @@ String LimitString(String text, uint16_t sz, bool fill);
 bool hasValidHeaderToken(AsyncWebServerRequest *request, String api_token);
 
 template<typename TComponent, typename FillFunc>
-void registerEndpoint(AsyncWebServer* server, TComponent component, const char* className, FillFunc fillJson, Configuration* devConfiguration, Log* devLog) {
+void registerEndpoint(AsyncWebServer* server, TComponent component, const char* className, FillFunc fillJson, String token, Log* devLog) {
     server->on(String("/" + component->Name()).c_str(), HTTP_GET, [=](AsyncWebServerRequest *request) {
         JsonDocument reply;
         String json;
 
-        if (hasValidHeaderToken(request, devConfiguration->Setting["Webhooks"]["Token"].as<String>())) {
+        if (hasValidHeaderToken(request, token)) {
             reply["Class"] = className;
             reply["Name"] = component->Name();
             fillJson(reply, component);

@@ -1,5 +1,81 @@
 {
-    "Components": [],
+    "Components": [
+        {
+            "Address": 14,
+            "Bus": "Onboard",
+            "Class": "Relay",
+            "Enabled": true,
+            "Events": {},
+            "Name": "OL1_Relay",
+            "State": false
+        },
+        {
+            "Address": 27,
+            "Bus": "Onboard",
+            "Class": "Relay",
+            "Enabled": true,
+            "Events": {},
+            "Name": "OL2_Relay",
+            "State": false
+        },
+        {
+            "Address": 26,
+            "Bus": "Onboard",
+            "Class": "Thermometer",
+            "Enabled": true,
+            "Events": {},
+            "Name": "Office",
+            "Type": "DS18B20"
+        },
+        {
+            "Address": 25,
+            "Bus": "Onboard",
+            "Class": "Thermometer",
+            "Enabled": true,
+            "Events": {},
+            "Name": "Rack",
+            "Type": "DS18B20"
+        },
+        {
+            "Address": 32,
+            "Bus": "Onboard",
+            "Class": "Relay",
+            "Enabled": true,
+            "Events": {},
+            "Name": "RK2_Relay",
+            "State": false
+        },
+        {
+            "Address": 33,
+            "Bus": "Onboard",
+            "Class": "ContactSensor",
+            "Enabled": true,
+            "Events": {},
+            "Name": "RK1_ContactSensor"
+        },
+        {
+            "Address": 12,
+            "Bus": "Onboard",
+            "Class": "Button",
+            "Enabled": true,
+            "Events": {
+                "Changed": "invert(OL1_Relay)"
+            },
+            "Name": "OL1_Button",
+            "Report": "EdgesOnly"
+        },
+        {
+            "Address": 13,
+            "Bus": "Onboard",
+            "Class": "Button",
+            "Enabled": true,
+            "Events": {
+                "Changed": "invert(OL2_Relay)"
+            },
+            "Name": "OL2_Button",
+            "Report": "EdgesOnly"
+        }
+    ],
     "General": {
         "I2C Bus": false,
         "NTP Server": "pool.ntp.org",
@@ -26,9 +102,9 @@
             "192.168.1.250"
         ],
         "Gateway": "192.168.1.250",
-        "Hostname": "DEVIQ-LAB",
+        "Hostname": "DEVIQ-OFFICE",
         "IP Address": "192.168.2.30",
-        "MAC Address": "D8:13:2A:7E:EE:C4",
+        "MAC Address": "3C:61:05:64:59:44",
         "Netmask": "255.255.255.0",
         "Online Checking": true,
         "Online Checking Minutes": 1,
@@ -61,7 +137,7 @@
         "Auto Reboot": true,
         "Check Interval": 172800000,
         "Debug": false,
-        "Update Manifest": "https://server.dts-network.com:8081/update-home.json"
+        "Update Manifest": "https://server.dts-network.com:8081/update.json"
     },
     "Webhooks": {
         "Enabled": true,
