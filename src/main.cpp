@@ -33,6 +33,7 @@ using namespace DeviceIQ_Network;
 using namespace DeviceIQ_Update;
 
 #include "Defaults.h"
+#include "Settings.h"
 
 FileSystem *devFileSystem;
 Configuration *devConfiguration;
@@ -73,10 +74,10 @@ void setup() {
     devLog = new Log(devFileSystem, devClock);
     devLog->SerialPort(&Serial);
     devLog->LogFileName(Defaults.Log.LogFileName);
-    devLog->Endpoint(devConfiguration->Get<Endpoints>("Log|Endpoint", Defaults.Log.EndPoint));
-    devLog->LogLevel(devConfiguration->Get<LogLevels>("Log|Level", Defaults.Log.LogLevel));
-    devLog->SyslogServerHost(devConfiguration->Get("Log|Syslog Server Host", Defaults.Log.SyslogServerHost));
-    devLog->SyslogServerPort(devConfiguration->Get<uint16_t>("Log|Syslog Port", Defaults.Log.SyslogServerPort));
+    devLog->Endpoint(Settings.Log.Endpoint());
+    devLog->LogLevel(Settings.Log.LogLevel());
+    devLog->SyslogServerHost(Settings.Log.SyslogServerHost());
+    devLog->SyslogServerPort(Settings.Log.SyslogServerPort());
 
     devLog->Write(Version.ProductFamily + " " + Version.Software.Info(), LOGLEVEL_INFO);
 
@@ -87,10 +88,10 @@ void setup() {
 
     // Network
     devNetwork = new Network();
-    devNetwork->DHCP_Client(devConfiguration->Get<bool>("Network|DHCP Client", Defaults.Network.DHCP_Client));
+    devNetwork->DHCP_Client(Settings.Network.DHCPClient());
     if (!devNetwork->DHCP_Client()) {
-        devNetwork->IP_Address(devConfiguration->Get("Network|IP Address", Defaults.Network.IP_Address));
-        devNetwork->Gateway(devConfiguration->Get("Network|Gateway", Defaults.Network.Gateway));
+        devNetwork->IP_Address(Settings.Network.IP_Address());
+        devNetwork->Gateway(Settings.Network.Gateway());
         devNetwork->Netmask(devConfiguration->Get("Network|Netmask", Defaults.Network.Netmask));
     }
 

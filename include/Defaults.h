@@ -4,6 +4,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <DevIQ_Log.h>
 
 struct defaults {
     const char ConfigFileName[254] = "/config.json";
@@ -11,8 +12,8 @@ struct defaults {
     
     struct log {
         const char LogFileName[254] = "/config.log";
-        const Endpoints EndPoint = ENDPOINT_SERIAL;
-        const LogLevels LogLevel = LOGLEVEL_ALL;
+        const DeviceIQ_Log::Endpoints EndPoint = DeviceIQ_Log::Endpoints::ENDPOINT_SERIAL;
+        const DeviceIQ_Log::LogLevels LogLevel = DeviceIQ_Log::LogLevels::LOGLEVEL_ALL;
         const char SyslogServerHost[254] = "";
         const uint16_t SyslogServerPort = 514;
     } Log;
