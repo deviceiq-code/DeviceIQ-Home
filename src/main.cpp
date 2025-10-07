@@ -102,37 +102,32 @@ void setup() {
     devNetwork->OnlineChecking(Settings.Network.OnlineChecking());
     devNetwork->OnlineCheckingTimeout(Settings.Network.OnlineCheckingTimeout());
 
-    devConfiguration->Set<String>("Network|MAC Address", devNetwork->MAC_Address());
-
     // Update
     devUpdateClient = new UpdateClient([&]{
         DeviceIQ_Update::UpdateConfig c;
         c.model = Version.ProductName;
         c.currentVersion = Version.Software.Info();
-        c.manifestUrl = devConfiguration->Get<String>("Update|Update Manifest", Defaults.Update.ManifestURL);
+        c.manifestUrl = Settings.Update.ManifestURL();
         c.rootCA_PEM = nullptr;
-        c.allowInsecure = devConfiguration->Get<bool>("Update|Allow Insecure", Defaults.Update.AllowInsecure);
-        // c.enableLanOta = true;
+        c.allowInsecure = Settings.Update.AllowInsecure();
+        c.enableLanOta = Settings.Update.EnableLANOTA();
 
-        c.lanHostname = devNetwork->Hostname();
-        c.lanPassword = "";
-        c.checkInterval = devConfiguration->Get<uint32_t>("Update|Check Interval", Defaults.Update.CheckUpdateInterval);
+        c.lanHostname = Settings.Network.Hostname();
+        c.lanPassword = Settings.Update.PasswordLANOTA();
+        c.checkInterval = Settings.Update.CheckInterval();
         c.httpTimeout = 15;
         c.streamBufSize = size_t(4096);
-        c.autoReboot = devConfiguration->Get<bool>("Update|Auto Reboot", Defaults.Update.AutoReboot);
+        c.autoReboot = Settings.Update.AutoReboot();
 
         return c;
     }());
 
-    // Parei aqui - o Set nao ta salvando
-    devConfiguration->Set<String>("Update|Update Manifest", Defaults.Update.ManifestURL, SaveUrgency::Critical);
-
     devUpdateClient->OnError([&](DeviceIQ_Update::Error e, const String& d) {
-        if (devConfiguration->Get<bool>("Update|Debug", Defaults.Update.Debug)) devLog->Write("Update Client: Error [" + String((int)e) + "] Detail [" + d + "]", LOGLEVEL_INFO);
+        if (Settings.Update.Debug()) devLog->Write("Update Client: Error [" + String((int)e) + "] Detail [" + d + "]", LOGLEVEL_INFO);
     });
 
     devUpdateClient->OnEvent([&](DeviceIQ_Update::Event e) {
-        const String v   = devUpdateClient->LatestVersion();
+        const String v = devUpdateClient->LatestVersion();
         const String min = devUpdateClient->LatestMinVersion();
         const String url = devUpdateClient->LatestUrl();
         const bool forced = DeviceIQ_Update::UpdateClient::IsNewer(min, Version.Software.Info());
@@ -142,16 +137,16 @@ void setup() {
                 devLog->Write("Update Client: New version " + v + " available (MIN " + min + ", FORCED " + (forced ? "Yes" : "No") + ")", forced ? LOGLEVEL_WARNING : LOGLEVEL_INFO);
             } break;
             case Event::Downloading: {
-                if (devConfiguration->Get<bool>("Update|Debug", Defaults.Update.Debug)) devLog->Write("Update Client: Downloading " + url, LOGLEVEL_INFO);
+                if (Settings.Update.Debug()) devLog->Write("Update Client: Downloading " + url, LOGLEVEL_INFO);
             } break;
             case Event::Verifying: {
-                if (devConfiguration->Get<bool>("Update|Debug", Defaults.Update.Debug)) devLog->Write("Update Client: Verifying new firmware integrity", LOGLEVEL_INFO);
+                if (Settings.Update.Debug()) devLog->Write("Update Client: Verifying new firmware integrity", LOGLEVEL_INFO);
             } break;
             case Event::Applying: {
-                if (devConfiguration->Get<bool>("Update|Debug", Defaults.Update.Debug)) devLog->Write("Update Client: Applying update", LOGLEVEL_INFO);
+                if (Settings.Update.Debug()) devLog->Write("Update Client: Applying update", LOGLEVEL_INFO);
             } break;
             case Event::Rebooting: {
-                if (devConfiguration->Get<bool>("Update|Debug", Defaults.Update.Debug)) devLog->Write("Update Client: Rebooting to apply update", LOGLEVEL_WARNING);
+                if (Settings.Update.Debug()) devLog->Write("Update Client: Rebooting to apply update", LOGLEVEL_WARNING);
             } break;
             default: break;
         }
@@ -367,11 +362,11 @@ void setup() {
                 devLog->Write("Network: " + devNetwork->Hostname() + " MAC " + devNetwork->MAC_Address() + " connected to " + devNetwork->SSID() + " IP " + devNetwork->IP_Address().toString(), LOGLEVEL_INFO);
 
                 // NTP
-                if (devConfiguration->Get<bool>("General|NTP Update", Defaults.NTP.Update)) {
-                    if (devClock->NTPUpdate(devConfiguration->Get<String>("General|NTP Server", Defaults.NTP.Server))) {
-                        devLog->Write("Date and Time: Updated from NTP server " + devConfiguration->Get<String>("General|NTP Server", Defaults.NTP.Server), LOGLEVEL_INFO);
+                if (Settings.General.NTPUpdate()) {
+                    if (devClock->NTPUpdate(Settings.General.NTPServer())) {
+                        devLog->Write("Date and Time: Updated from NTP server " + Settings.General.NTPServer(), LOGLEVEL_INFO);
                     } else {
-                        devLog->Write("Date and Time: Failed to update from NTP server " + devConfiguration->Get<String>("General|NTP Server", Defaults.NTP.Server), LOGLEVEL_ERROR);
+                        devLog->Write("Date and Time: Failed to update from NTP server " + Settings.General.NTPServer(), LOGLEVEL_ERROR);
                     }
                 } else {
                     devLog->Write("Date and Time: Using local settings", LOGLEVEL_INFO);
@@ -379,11 +374,10 @@ void setup() {
 
                 // Orchestrator
                 ClientManager::getInstance().begin();
-                if (devConfiguration->Get<bool>("Orchestrator|Assigned", Defaults.Orchestrator.Assigned) && !devConfiguration->Get<String>("Orchestrator|Server ID").isEmpty()) {
-                    devLog->Write("Orchestrator: Device assigned to server ID " + devConfiguration->Get<String>("Orchestrator|Server ID"), LOGLEVEL_WARNING);
+                if (Settings.Orchestrator.Assigned() && !Settings.Orchestrator.ServerID().isEmpty()) {
+                    devLog->Write("Orchestrator: Device assigned to server ID " + Settings.Orchestrator.ServerID(), LOGLEVEL_WARNING);
                     JsonDocument cmd;
-                    cmd["Server ID"] = devConfiguration->Get<String>("Orchestrator|Server ID");
-                    
+                    cmd["Server ID"] = Settings.Orchestrator.ServerID();
                     ClientManager::getInstance().Refresh(cmd);
                 } else {
                     devLog->Write("Orchestrator: Device is not assigned to an Orchestrator server", LOGLEVEL_WARNING);
@@ -391,11 +385,11 @@ void setup() {
 
                 // Webhooks/MQTT
                 if (!interfacesRegistered) {
-                    devWebhook = new AsyncWebServer(devConfiguration->Get<uint16_t>("Webhooks|Port", Defaults.WebHooks.Port));
+                    devWebhook = new AsyncWebServer(Settings.WebHooks.Port());
                     devWebhook->onNotFound([](AsyncWebServerRequest *request) { request->send(404); });
 
                     // Webhooks
-                    if (devConfiguration->Get<bool>("Webhooks|Enable", Defaults.WebHooks.Enable)) {
+                    if (Settings.WebHooks.Enabled()) {
                         for (auto m : devCollection) {
                             switch (m->Class()) {
 
@@ -404,7 +398,7 @@ void setup() {
                                         JsonDocument reply;
                                         String json;
 
-                                        if (hasValidHeaderToken(request, devConfiguration->Get<String>("Webhooks|Token", Defaults.WebHooks.Token())) == true) {
+                                        if (hasValidHeaderToken(request, Settings.WebHooks.Token()) == true) {
                                             bool setnewvalue = false;
                                             String Arg, Val;
 
@@ -450,62 +444,62 @@ void setup() {
                                 case CLASS_PIR : {
                                     registerEndpoint(devWebhook, m, "PIR", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
                                         reply["Motion"] = comp->as<PIR>()->State();
-                                    }, devConfiguration->Get<String>("Webhooks|Token", Defaults.WebHooks.Token()), devLog);
+                                    }, Settings.WebHooks.Token(), devLog);
                                 } break;
 
                                 case CLASS_BUTTON: {
                                     registerEndpoint(devWebhook, m, "Button", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
                                         reply["Pressed"] = comp->as<Button>()->IsPressed();
-                                    }, devConfiguration->Get<String>("Webhooks|Token", Defaults.WebHooks.Token()), devLog);
+                                    }, Settings.WebHooks.Token(), devLog);
                                 } break;
 
                                 case CLASS_CURRENTMETER: {
                                     registerEndpoint(devWebhook, m, "Currentmeter", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
                                         reply["Current AC"] = comp->as<Currentmeter>()->CurrentAC();
                                         reply["Current DC"] = comp->as<Currentmeter>()->CurrentDC();
-                                    }, devConfiguration->Get<String>("Webhooks|Token", Defaults.WebHooks.Token()), devLog);
+                                    }, Settings.WebHooks.Token(), devLog);
                                 } break;
 
                                 case CLASS_THERMOMETER: {
                                     registerEndpoint(devWebhook, m, "Thermometer", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
                                         reply["Humidity"] = comp->as<Thermometer>()->Humidity();
                                         reply["Temperature"] = comp->as<Thermometer>()->Temperature();
-                                    }, devConfiguration->Get<String>("Webhooks|Token", Defaults.WebHooks.Token()), devLog);
+                                    }, Settings.WebHooks.Token(), devLog);
                                 } break;
 
                                 case CLASS_BLINDS: {
                                     registerEndpoint(devWebhook, m, "Blinds", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
                                         reply["Position"] = comp->as<Blinds>()->Position();
                                         reply["State"] = comp->as<Blinds>()->State() == BlindsStates::BLINDSSTATE_DECREASING ? "Decreasing" : (comp->as<Blinds>()->State() == BlindsStates::BLINDSSTATE_INCREASING ? "Increasing" : "Stopped");
-                                    }, devConfiguration->Get<String>("Webhooks|Token", Defaults.WebHooks.Token()), devLog);
+                                    }, Settings.WebHooks.Token(), devLog);
                                 } break;
 
                                 case CLASS_DOORBELL: {
                                     registerEndpoint(devWebhook, m, "Doorbell", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
                                         reply["State"] = comp->as<Doorbell>()->State();
-                                    }, devConfiguration->Get<String>("Webhooks|Token", Defaults.WebHooks.Token()), devLog);
+                                    }, Settings.WebHooks.Token(), devLog);
                                 } break;
 
                                 case CLASS_CONTACTSENSOR: {
                                     registerEndpoint(devWebhook, m, "ContactSensor", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
                                         reply["State"] = comp->as<ContactSensor>()->State();
-                                    }, devConfiguration->Get<String>("Webhooks|Token", Defaults.WebHooks.Token()), devLog);
+                                    }, Settings.WebHooks.Token(), devLog);
                                 } break;
                             }
                         }
 
                         devWebhook->begin();
-                        devLog->Write("Webhooks: Enabled on port " + String(devConfiguration->Get<uint16_t>("Webhooks|Port", Defaults.WebHooks.Port)), LOGLEVEL_INFO);
+                        devLog->Write("Webhooks: Enabled on port " + String(Settings.WebHooks.Port()), LOGLEVEL_INFO);
                     } else {
                         devLog->Write("Webhooks: Disabled", LOGLEVEL_INFO);
                     }
 
                     // MQTT
-                    if (devConfiguration->Get<bool>("MQTT|Enable", Defaults.MQTT.Enable)) {
-                        devMQTT->Broker(devConfiguration->Get("MQTT|Broker", Defaults.MQTT.Broker));
-                        devMQTT->Port(devConfiguration->Get<uint16_t>("MQTT|Port", Defaults.MQTT.Port));
-                        devMQTT->User(devConfiguration->Get("MQTT|User", Defaults.MQTT.User));
-                        devMQTT->Password(devConfiguration->Get("MQTT|Password", Defaults.MQTT.Password));
+                    if (Settings.MQTT.Enabled()) {
+                        devMQTT->Broker(Settings.MQTT.Broker());
+                        devMQTT->Port(Settings.MQTT.Port());
+                        devMQTT->User(Settings.MQTT.User());
+                        devMQTT->Password(Settings.MQTT.Password());
 
                         devMQTT->Subscribe(devNetwork->Hostname() + "/Set/#", [&](const String& topic, const String& payload) {
                             const String prefixSet = devNetwork->Hostname() + "/Set/";
@@ -619,9 +613,7 @@ void setup() {
             } break;
         }
 
-        if (devConfiguration->Get<bool>("Update|Check On Boot", Defaults.Update.CheckOnBoot)) devUpdateClient->CheckUpdateNow();
-
-
+        if (Settings.Update.CheckAtStartup()) devUpdateClient->CheckUpdateNow();
     });
     devNetwork->Connect();
 }

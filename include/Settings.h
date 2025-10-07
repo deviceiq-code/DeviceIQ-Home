@@ -5,6 +5,8 @@
 
 #include <Arduino.h>
 
+#include "Defaults.h"
+
 class settings_t {
     private:
     public:
@@ -80,6 +82,103 @@ class settings_t {
                 [[nodiscard]] uint16_t OnlineCheckingTimeout() const noexcept { return pOnlineCheckingTimeout; }
                 void OnlineCheckingTimeout(uint16_t value) { pOnlineCheckingTimeout = (value == 0) ? 514 : value; }
         } Network;
+        class update_t {
+            private:
+                String pManifestURL;
+                bool pAllowInsecure{};
+                bool pEnableLANOTA{};
+                String pPasswordLANOTA;
+                uint16_t pCheckInterval;
+                bool pAutoReboot{};
+                bool pDebug{};
+                bool pCheckAtStartup{};
+            public:
+                [[nodiscard]] const String& ManifestURL() const noexcept { return pManifestURL; }
+                void ManifestURL(String value) noexcept;
+
+                [[nodiscard]] bool AllowInsecure() const noexcept { return pAllowInsecure; }
+                void AllowInsecure(bool value) noexcept { pAllowInsecure = value; }
+
+                [[nodiscard]] bool EnableLANOTA() const noexcept { return pEnableLANOTA; }
+                void EnableLANOTA(bool value) noexcept { pEnableLANOTA = value; }
+
+                [[nodiscard]] const String& PasswordLANOTA() const noexcept { return pPasswordLANOTA; }
+                void PasswordLANOTA(String value) noexcept;
+
+                [[nodiscard]] uint16_t CheckInterval() const noexcept { return pCheckInterval; }
+                void CheckInterval(uint16_t value) { pCheckInterval = value; }
+
+                [[nodiscard]] bool AutoReboot() const noexcept { return pAutoReboot; }
+                void AutoReboot(bool value) noexcept { pAutoReboot = value; }
+
+                [[nodiscard]] bool Debug() const noexcept { return pDebug; }
+                void Debug(bool value) noexcept { pDebug = value; }
+
+                [[nodiscard]] bool CheckAtStartup() const noexcept { return pCheckAtStartup; }
+                void CheckAtStartup(bool value) noexcept { pCheckAtStartup = value; }
+        } Update;
+        class general_t {
+            private:
+                bool pNTPUpdate{};
+                String pNTPServer;
+            public:
+                [[nodiscard]] bool NTPUpdate() const noexcept { return pNTPUpdate; }
+                void NTPUpdate(bool value) noexcept { pNTPUpdate = value; }
+
+                [[nodiscard]] const String& NTPServer() const noexcept { return pNTPServer; }
+                void NTPServer(String value) noexcept;
+        } General;
+        class orchestrator_t {
+            private:
+                bool pAssigned{};
+                String pServerID;
+            public:
+                [[nodiscard]] bool Assigned() const noexcept { return pAssigned; }
+                void Assigned(bool value) noexcept { pAssigned = value; }
+
+                [[nodiscard]] const String& ServerID() const noexcept { return pServerID; }
+                void ServerID(String value) noexcept;
+        } Orchestrator;
+        class webhooks_t {
+            private:
+                uint16_t pPort{};
+                bool pEnabled{};
+                String pToken;
+            public:
+                [[nodiscard]] uint16_t Port() const noexcept { return pPort; }
+                void Port(uint16_t value) { pPort = (value == 0) ? 80 : value; }
+
+                [[nodiscard]] bool Enabled() const noexcept { return pEnabled; }
+                void Enabled(bool value) noexcept { pEnabled = value; }
+
+                [[nodiscard]] const String& Token() const noexcept { return pToken; }
+                void Token(String value) noexcept;
+        } WebHooks;
+        class mqtt_t {
+            private:
+                bool pEnabled{};
+                String pBroker;
+                uint16_t pPort{};
+                String pUser;
+                String pPassword;
+            public:
+                [[nodiscard]] bool Enabled() const noexcept { return pEnabled; }
+                void Enabled(bool value) noexcept { pEnabled = value; }
+
+                [[nodiscard]] const String& Broker() const noexcept { return pBroker; }
+                void Broker(String value) noexcept;
+
+                [[nodiscard]] uint16_t Port() const noexcept { return pPort; }
+                void Port(uint16_t value) { pPort = (value == 0) ? 80 : value; }
+
+                [[nodiscard]] const String& User() const noexcept { return pUser; }
+                void User(String value) noexcept;
+
+                [[nodiscard]] const String& Password() const noexcept { return pPassword; }
+                void Password(String value) noexcept;
+        } MQTT;
+
+        void ResetToDefaults();
 };
 
 extern settings_t Settings;

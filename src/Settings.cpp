@@ -178,3 +178,262 @@ void settings_t::network_t::Passphrase(String value) noexcept {
 
     pPassphrase = String();
 }
+
+void settings_t::update_t::ManifestURL(String value) noexcept {
+    value.trim();
+    value.toLowerCase();
+
+    constexpr size_t MIN_URL_LEN = 10;
+    constexpr size_t MAX_URL_LEN = 200;
+
+    if (value.length() < MIN_URL_LEN || value.length() > MAX_URL_LEN) {
+        pManifestURL = String();
+        return;
+    }
+
+    if (!value.startsWith("http://") && !value.startsWith("https://")) {
+        pManifestURL = String();
+        return;
+    }
+    for (size_t i = 0; i < value.length(); ++i) {
+        unsigned char c = static_cast<unsigned char>(value[i]);
+        if (c <= 0x20 || c >= 0x7F) {
+            pManifestURL = String();
+            return;
+        }
+    }
+
+    pManifestURL = std::move(value);
+}
+
+void settings_t::update_t::PasswordLANOTA(String value) noexcept {
+    value.trim();
+
+    constexpr size_t MIN_LEN = 6;
+    constexpr size_t MAX_LEN = 64;
+
+    if (value.length() < MIN_LEN || value.length() > MAX_LEN) {
+        pPasswordLANOTA = String();
+        return;
+    }
+
+    for (size_t i = 0; i < value.length(); ++i) {
+        unsigned char c = static_cast<unsigned char>(value[i]);
+        if (c < 0x20 || c > 0x7E) {
+            pPasswordLANOTA = String();
+            return;
+        }
+    }
+
+    pPasswordLANOTA = std::move(value);
+}
+
+void settings_t::general_t::NTPServer(String value) noexcept {
+    value.trim();
+    value.toLowerCase();
+
+    constexpr size_t MIN_LEN = 3;
+    constexpr size_t MAX_LEN = 128;
+
+    if (value.length() == 0) {
+        pNTPServer = "pool.ntp.org";
+        return;
+    }
+
+    if (value.length() < MIN_LEN || value.length() > MAX_LEN) {
+        pNTPServer = "pool.ntp.org";
+        return;
+    }
+
+    for (size_t i = 0; i < value.length(); ++i) {
+        char c = value.charAt(i);
+        bool ok = (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || (c == '.') || (c == '-');
+        if (!ok) {
+            pNTPServer = "pool.ntp.org";
+            return;
+        }
+    }
+
+    if (value.indexOf(' ') >= 0) {
+        pNTPServer = "pool.ntp.org";
+        return;
+    }
+
+    pNTPServer = std::move(value);
+}
+
+void settings_t::orchestrator_t::ServerID(String value) noexcept {
+    value.trim();
+    value.toUpperCase();
+
+    constexpr size_t REQUIRED_LEN = 15;
+    if (value.length() != REQUIRED_LEN) {
+        pServerID = String();
+        return;
+    }
+
+    for (size_t i = 0; i < value.length(); ++i) {
+        char c = value.charAt(i);
+        bool ok = (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
+        if (!ok) {
+            pServerID = String();
+            return;
+        }
+    }
+
+    pServerID = std::move(value);
+}
+
+void settings_t::webhooks_t::Token(String value) noexcept {
+    value.trim();
+
+    constexpr size_t MIN_LEN = 16;
+    constexpr size_t MAX_LEN = 64;
+
+    if (value.length() < MIN_LEN || value.length() > MAX_LEN) {
+        pToken = String();
+        return;
+    }
+
+    for (size_t i = 0; i < value.length(); ++i) {
+        char c = value.charAt(i);
+        bool ok = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || (c == '-') || (c == '_');
+        if (!ok) {
+            pToken = String();
+            return;
+        }
+    }
+
+    pToken = std::move(value);
+}
+
+void settings_t::mqtt_t::Broker(String value) noexcept {
+    value.trim();
+    value.toLowerCase();
+
+    constexpr size_t MIN_LEN = 3;
+    constexpr size_t MAX_LEN = 128;
+
+    if (value.length() == 0) {
+        pBroker = String();
+        return;
+    }
+
+    if (value.length() < MIN_LEN || value.length() > MAX_LEN) {
+        pBroker = String();
+        return;
+    }
+
+    for (size_t i = 0; i < value.length(); ++i) {
+        char c = value.charAt(i);
+        bool ok = (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || (c == '.') || (c == '-');
+        if (!ok) {
+            pBroker = String();
+            return;
+        }
+    }
+
+    if (value.indexOf(' ') >= 0) {
+        pBroker = String();
+        return;
+    }
+
+    pBroker = std::move(value);
+}
+
+void settings_t::mqtt_t::User(String value) noexcept {
+    value.trim();
+
+    constexpr size_t MIN_LEN = 3;
+    constexpr size_t MAX_LEN = 64;
+
+    if (value.length() < MIN_LEN || value.length() > MAX_LEN) {
+        pUser = String();
+        return;
+    }
+
+    for (size_t i = 0; i < value.length(); ++i) {
+        char c = value.charAt(i);
+        bool ok = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || (c == '.') || (c == '_') || (c == '-');
+        if (!ok) {
+            pUser = String();
+            return;
+        }
+    }
+
+    pUser = std::move(value);
+}
+
+void settings_t::mqtt_t::Password(String value) noexcept {
+    value.trim();
+
+    constexpr size_t MIN_LEN = 6;
+    constexpr size_t MAX_LEN = 64;
+
+    if (value.length() < MIN_LEN || value.length() > MAX_LEN) {
+        pPassword = String();
+        return;
+    }
+
+    for (size_t i = 0; i < value.length(); ++i) {
+        unsigned char c = static_cast<unsigned char>(value[i]);
+        if (c < 0x20 || c > 0x7E) {
+            pPassword = String();
+            return;
+        }
+    }
+
+    pPassword = std::move(value);
+}
+
+void settings_t::ResetToDefaults() {
+    // Log
+    Log.Endpoint(Defaults.Log.Endpoint);
+    Log.LogLevel(Defaults.Log.Level);
+    Log.SyslogServerHost(Defaults.Log.SyslogServer);
+    Log.SyslogServerPort(Defaults.Log.SyslogPort);
+
+    // Network
+    Network.DHCPClient(Defaults.Network.DHCPClient);
+    Network.Hostname(Defaults.Network.Hostname);
+    Network.IP_Address(Defaults.Network.IP_Address.toString()); // setter espera String
+    Network.Gateway(Defaults.Network.Gateway.toString());
+    Network.Netmask(Defaults.Network.Netmask.toString());
+    Network.DNS(0, Defaults.Network.DNS[0].toString());
+    Network.DNS(1, Defaults.Network.DNS[1].toString());
+    Network.SSID(Defaults.Network.SSID);
+    Network.Passphrase(Defaults.Network.Passphrase);
+    Network.ConnectionTimeout(Defaults.Network.ConnectionTimeout);
+    Network.OnlineChecking(Defaults.Network.OnlineChecking);
+    Network.OnlineCheckingTimeout(Defaults.Network.OnlineCheckingTimeout);
+
+    // Update
+    Update.ManifestURL(Defaults.Update.ManifestURL);
+    Update.AllowInsecure(Defaults.Update.AllowInsecure);
+    Update.EnableLANOTA(Defaults.Update.EnableLANOTA);
+    Update.PasswordLANOTA(Defaults.Update.PasswordLANOTA);
+    Update.CheckInterval(Defaults.Update.CheckInterval);
+    Update.AutoReboot(Defaults.Update.AutoReboot);
+    Update.Debug(Defaults.Update.Debug);
+    Update.CheckAtStartup(Defaults.Update.CheckAtStartup);
+
+    // General
+    General.NTPUpdate(Defaults.General.NTPUpdate);
+    General.NTPServer(Defaults.General.NTPServer);
+
+    // Orchestrator
+    Orchestrator.Assigned(Defaults.Orchestrator.Assigned);
+    Orchestrator.ServerID(Defaults.Orchestrator.ServerID);
+
+    // WebHooks
+    WebHooks.Port(Defaults.WebHooks.Port);
+    WebHooks.Enabled(Defaults.WebHooks.Enabled);
+    WebHooks.Token(Defaults.WebHooks.Token);
+
+    // MQTT
+    MQTT.Enabled(Defaults.MQTT.Enabled);
+    MQTT.Broker(Defaults.MQTT.Broker);
+    MQTT.Port(Defaults.MQTT.Port);
+    MQTT.User(Defaults.MQTT.User);
+    MQTT.Password(Defaults.MQTT.Password);
+}
