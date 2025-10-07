@@ -35,6 +35,8 @@ using namespace DeviceIQ_Update;
 #include "Defaults.h"
 #include "Settings.h"
 
+settings_t Settings;
+
 FileSystem *devFileSystem;
 Configuration *devConfiguration;
 Clock *devClock;
@@ -84,28 +86,21 @@ void setup() {
     // MQTT
     devMQTT = new MQTT();
 
-    serializeJsonPretty(devConfiguration->Setting, Serial);
-
     // Network
     devNetwork = new Network();
     devNetwork->DHCP_Client(Settings.Network.DHCPClient());
     if (!devNetwork->DHCP_Client()) {
         devNetwork->IP_Address(Settings.Network.IP_Address());
         devNetwork->Gateway(Settings.Network.Gateway());
-        devNetwork->Netmask(devConfiguration->Get("Network|Netmask", Defaults.Network.Netmask));
+        devNetwork->Netmask(Settings.Network.Netmask());
     }
 
-    if (devConfiguration->Get<String>("Network|Hostname").isEmpty()) {
-        devConfiguration->Set<String>("Network|Hostname", Defaults.Network.Hostname(), DeviceIQ_Configuration::SaveUrgency::Critical);
-        devLog->Write("Network: Hostname not set. Configuring new hostname as " + Defaults.Network.Hostname(), LOGLEVEL_WARNING);
-    }
-
-    devNetwork->Hostname(devConfiguration->Get("Network|Hostname"));
-    devNetwork->SSID(devConfiguration->Get("Network|SSID", Defaults.Network.SSID));
-    devNetwork->Passphrase(devConfiguration->Get("Network|Passphrase", Defaults.Network.Passphrase));
-    devNetwork->ConnectionTimeout(devConfiguration->Get<uint16_t>("Network|Connection Timeout", Defaults.Network.ConnectionTimeout));
-    devNetwork->OnlineChecking(devConfiguration->Get<bool>("Network|Online Checking", Defaults.Network.OnlineChecking));
-    devNetwork->OnlineCheckingTimeout(devConfiguration->Get<uint16_t>("Network|Online Checking Timeout", Defaults.Network.OnlineCheckingTimeout));
+    devNetwork->Hostname(Settings.Network.Hostname());
+    devNetwork->SSID(Settings.Network.SSID());
+    devNetwork->Passphrase(Settings.Network.Passphrase());
+    devNetwork->ConnectionTimeout(Settings.Network.ConnectionTimeout());
+    devNetwork->OnlineChecking(Settings.Network.OnlineChecking());
+    devNetwork->OnlineCheckingTimeout(Settings.Network.OnlineCheckingTimeout());
 
     devConfiguration->Set<String>("Network|MAC Address", devNetwork->MAC_Address());
 

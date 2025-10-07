@@ -80,8 +80,35 @@ void settings_t::network_t::Gateway(String value) noexcept {
 }
 
 bool settings_t::network_t::isValidNetmask(const IPAddress& mask) noexcept {
-    uint32_t m = ((uint32_t)mask[0] << 24) | ((uint32_t)mask[1] << 16) | ((uint32_t)mask[2] << 8) | ((uint32_t)mask[3]);
-    return (m != 0 && (m & (~m + 1)) == 0);
+    uint32_t m = (uint32_t(mask[0]) << 24) | (uint32_t(mask[1]) << 16) | (uint32_t(mask[2]) << 8)  | uint32_t(mask[3]);
+    return m != 0 && ((m | (m - 1)) == 0xFFFFFFFFu);
+}
+
+void settings_t::network_t::stripControlChars(String& s) noexcept {
+    String out; out.reserve(s.length());
+    for (size_t i = 0; i < s.length(); ++i) {
+        unsigned char c = static_cast<unsigned char>(s[i]);
+        if ((c >= 0x20 && c != 0x7F)) out += char(c);
+    }
+    s = out;
+}
+
+bool settings_t::network_t::isPrintableASCII(const String& s) noexcept {
+    for (size_t i = 0; i < s.length(); ++i) {
+        unsigned char c = static_cast<unsigned char>(s[i]);
+        if (c < 0x20 || c > 0x7E) return false;
+    }
+    return true;
+}
+
+bool settings_t::network_t::isHex64(const String& s) noexcept {
+    if (s.length() != 64) return false;
+    for (size_t i = 0; i < 64; ++i) {
+        char c = s[i];
+        bool hex = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+        if (!hex) return false;
+    }
+    return true;
 }
 
 void settings_t::network_t::Netmask(String value) noexcept {
@@ -104,4 +131,50 @@ void settings_t::network_t::Netmask(String value) noexcept {
     }
 
     pNetmask = parsed;
+}
+
+void settings_t::network_t::DNS(uint8_t index, String value) noexcept {
+    if (index >= 2) return;
+    sanitizeIpString(value);
+
+    if (value.length() == 0) { pDNS[index] = IPAddress(0,0,0,0); return; }
+
+    IPAddress parsed;
+    if (!parsed.fromString(value)) { pDNS[index] = IPAddress(0,0,0,0); return; }
+
+    bool isBroadcast = (parsed[0]==255 && parsed[1]==255 && parsed[2]==255 && parsed[3]==255);
+    bool isMulticast = (parsed[0] >= 224 && parsed[0] <= 239);
+    if (isBroadcast || isMulticast) { pDNS[index] = IPAddress(0,0,0,0); return; }
+
+    pDNS[index] = parsed;  
+}
+
+void settings_t::network_t::SSID(String value) noexcept {
+    value.trim();
+    stripControlChars(value);
+
+    if (value.length() > 32) value.remove(32);
+
+    pSSID = std::move(value);
+}
+
+void settings_t::network_t::Passphrase(String value) noexcept {
+    value.trim();
+
+    if (value.length() == 0) {
+        pPassphrase = String();
+        return;
+    }
+
+    if (isHex64(value)) {
+        pPassphrase = std::move(value);
+        return;
+    }
+
+    if (value.length() >= 8 && value.length() <= 63 && isPrintableASCII(value)) {
+        pPassphrase = std::move(value);
+        return;
+    }
+
+    pPassphrase = String();
 }
