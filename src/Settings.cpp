@@ -395,8 +395,8 @@ void settings_t::ResetToDefaults() {
 
     // Network
     Network.DHCPClient(Defaults.Network.DHCPClient);
-    Network.Hostname(Defaults.Network.Hostname);
-    Network.IP_Address(Defaults.Network.IP_Address.toString()); // setter espera String
+    Network.Hostname(Defaults.Network.Hostname());
+    Network.IP_Address(Defaults.Network.IP_Address.toString());
     Network.Gateway(Defaults.Network.Gateway.toString());
     Network.Netmask(Defaults.Network.Netmask.toString());
     Network.DNS(0, Defaults.Network.DNS[0].toString());

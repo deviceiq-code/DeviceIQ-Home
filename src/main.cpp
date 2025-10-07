@@ -68,6 +68,8 @@ void setup() {
         //if (!devConfiguration->ResetToDefaultSettings()) while (1);
     }
 
+    // Settings
+
     // Clock
     devClock = new Clock();
     devClock->EpochUpdate(Defaults.InitialTimeAndDate);

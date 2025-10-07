@@ -4,70 +4,67 @@
 #pragma once
 
 #include <Arduino.h>
-#include <DevIQ_Log.h>
 
-struct defaults {
-    const char ConfigFileName[254] = "/config.json";
-    const uint32_t InitialTimeAndDate = 1708136755;
-    
-    struct log {
-        const char LogFileName[254] = "/config.log";
-        const DeviceIQ_Log::Endpoints EndPoint = DeviceIQ_Log::Endpoints::ENDPOINT_SERIAL;
-        const DeviceIQ_Log::LogLevels LogLevel = DeviceIQ_Log::LogLevels::LOGLEVEL_ALL;
-        const char SyslogServerHost[254] = "";
-        const uint16_t SyslogServerPort = 514;
-    } Log;
+#pragma once
+#include <Arduino.h>
+#include <IPAddress.h>
 
-    struct network {
-        const bool DHCP_Client = true;
-        const char IP_Address[16] = "192.168.4.1";
-        const char Gateway[16] = "192.168.4.1";
-        const char Netmask[16] = "255.255.255.0";
-        const char SSID[31] = "IOT-2";
-        const char Passphrase[31] = "1921682GenesisIOT-2";
-        String Hostname() const { uint8_t mac[6]; esp_read_mac(mac, ESP_MAC_WIFI_STA); char buf[12]; snprintf(buf, sizeof(buf), "DEV-%02X%02X%02X", mac[3], mac[4], mac[5]); return String(buf); }
-        const uint16_t ConnectionTimeout = 15;
-        const bool OnlineChecking = true;
-        const uint16_t OnlineCheckingTimeout = 60;
-    } Network;
-
-    struct components {
-        const bool Enable = true;
-    } Components;
-
-    struct ntp {
-        const bool Update = true;
-        const char Server[254] = "pool.ntp.org";
-    } NTP;
-
-    struct orchestrator {
-        const bool Assigned = false;
-    } Orchestrator;
-
-    struct webhooks {
-        const uint16_t Port = 80;
-        const bool Enable = true;
-        String Token() const { uint8_t mac[6]; esp_read_mac(mac, ESP_MAC_WIFI_STA); char buf[12]; snprintf(buf, sizeof(buf), "TOKEN-%02X%02X%02X", mac[3], mac[4], mac[5]); return String(buf); }
-    } WebHooks;
-
-    struct mqtt {
-        const bool Enable = false;
-        const char Broker[254] = "mqttbroker";
-        const uint16_t Port = 1883;
-        const char User[31] = "deviceiq";
-        const char Password[31] = "deviceiq";
-    } MQTT;
-
-    struct update {
-        const char ManifestURL[254] = "https://server.dts-network.com:8081/update.json";
-        const bool AllowInsecure = true;
-        const bool Debug = true;
-        const uint32_t CheckUpdateInterval = 21600; // 6h
-        const bool AutoReboot = true;
-        const bool CheckOnBoot = true;
-    } Update;
+class defaults_t {
+    public:
+        struct log_t {
+            const char* LogFileName = "/config.log";
+            const uint8_t Endpoint = 0b00000101; // Serial + File
+            const uint8_t Level = 0b11111111; // All
+            const char* SyslogServer = "syslog.svr";
+            const uint16_t SyslogPort = 514;
+        } Log;
+        struct network_t {
+            const bool DHCPClient = true;
+            String Hostname() const { uint8_t mac[6]; esp_read_mac(mac, ESP_MAC_WIFI_STA); char buf[12]; snprintf(buf, sizeof(buf), "DEV-%02X%02X%02X", mac[3], mac[4], mac[5]); return String(buf); }
+            const IPAddress IP_Address = IPAddress(0,0,0,0);
+            const IPAddress Gateway = IPAddress(0,0,0,0);
+            const IPAddress Netmask = IPAddress(255,255,255,0);
+            const IPAddress DNS[2] = { IPAddress(8,8,8,8), IPAddress(8,8,4,4) };
+            const char* SSID = "";
+            const char* Passphrase = "";
+            const uint16_t ConnectionTimeout = 30;
+            const bool OnlineChecking = true;
+            const uint16_t OnlineCheckingTimeout = 10;
+        } Network;
+        struct update_t {
+            const char* ManifestURL = "https://server.dts-network.com:8081/update.json";
+            const bool AllowInsecure = false;
+            const bool EnableLANOTA = false;
+            const char* PasswordLANOTA = "";
+            const uint16_t CheckInterval = 3600;
+            const bool AutoReboot = true;
+            const bool Debug = false;
+            const bool CheckAtStartup = true;
+        } Update;
+        struct general_t {
+            const bool NTPUpdate = true;
+            const char* NTPServer = "pool.ntp.org";
+        } General;
+        struct orchestrator_t {
+            const bool Assigned = false;
+            const char* ServerID = "";
+        } Orchestrator;
+        struct webhooks_t {
+            const uint16_t Port = 80;
+            const bool Enabled = false;
+            const char* Token = "";
+        } WebHooks;
+        struct mqtt_t {
+            const bool Enabled = false;
+            const char* Broker = "";
+            const uint16_t Port = 1883;
+            const char* User = "";
+            const char* Password = "";
+        } MQTT;
+        const char ConfigFileName[254] = "/config.json";
+        const uint32_t InitialTimeAndDate = 1708136755;
 };
 
-inline constexpr defaults Defaults{};
+extern const defaults_t Defaults;
 
 #endif
