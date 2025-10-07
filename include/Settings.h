@@ -4,11 +4,18 @@
 #pragma once
 
 #include <Arduino.h>
+#include <ArduinoJson.h>
+#include <DevIQ_FileSystem.h>
+
+extern DeviceIQ_FileSystem::FileSystem* devFileSystem;
 
 #include "Defaults.h"
 
 class settings_t {
     private:
+        bool toU16(JsonVariantConst v, uint16_t& out);
+        bool toBool(JsonVariantConst v, bool& out);
+        static String ipStringFrom(JsonVariantConst v);
     public:
         class log_t {
             private:
@@ -178,7 +185,8 @@ class settings_t {
                 void Password(String value) noexcept;
         } MQTT;
 
-        void ResetToDefaults();
+        void LoadDefaults();
+        bool Load(const String& configfilename) noexcept;
 };
 
 extern settings_t Settings;
