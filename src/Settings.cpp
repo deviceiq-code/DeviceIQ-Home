@@ -396,11 +396,11 @@ void settings_t::LoadDefaults() {
     // Network
     Network.DHCPClient(Defaults.Network.DHCPClient);
     Network.Hostname(Defaults.Network.Hostname());
-    Network.IP_Address(Defaults.Network.IP_Address.toString());
-    Network.Gateway(Defaults.Network.Gateway.toString());
-    Network.Netmask(Defaults.Network.Netmask.toString());
-    Network.DNS(0, Defaults.Network.DNS[0].toString());
-    Network.DNS(1, Defaults.Network.DNS[1].toString());
+    Network.IP_Address(Defaults.Network.IP_Address);
+    Network.Gateway(Defaults.Network.Gateway);
+    Network.Netmask(Defaults.Network.Netmask);
+    Network.DNS(0, Defaults.Network.DNS[0]);
+    Network.DNS(1, Defaults.Network.DNS[1]);
     Network.SSID(Defaults.Network.SSID);
     Network.Passphrase(Defaults.Network.Passphrase);
     Network.ConnectionTimeout(Defaults.Network.ConnectionTimeout);
@@ -438,46 +438,6 @@ void settings_t::LoadDefaults() {
     MQTT.Password(Defaults.MQTT.Password);
 }
 
-bool settings_t::toU16(JsonVariantConst v, uint16_t& out) {
-    if (v.is<unsigned long>()) {
-        unsigned long val = v.as<unsigned long>();
-        if (val <= 65535UL) { out = static_cast<uint16_t>(val); return true; }
-    }
-    if (v.is<long>()) {
-        long val = v.as<long>();
-        if (val >= 0 && val <= 65535) { out = static_cast<uint16_t>(val); return true; }
-    }
-    if (v.is<const char*>()) {
-        char* end = nullptr;
-        long val = strtol(v.as<const char*>(), &end, 10);
-        if (end && *end == '\0' && val >= 0 && val <= 65535) { out = static_cast<uint16_t>(val); return true; }
-    }
-    return false;
-}
-
-bool settings_t::toBool(JsonVariantConst v, bool& out) {
-    if (v.is<bool>()) { out = v.as<bool>(); return true; }
-    if (v.is<long>()) { out = v.as<long>() != 0; return true; }
-    if (v.is<const char*>()) {
-        const char* s = v.as<const char*>();
-        if (!s) return false;
-        if (!strcasecmp(s, "true") || !strcasecmp(s, "yes") || !strcmp(s, "1"))  { out = true;  return true; }
-        if (!strcasecmp(s, "false")|| !strcasecmp(s, "no")  || !strcmp(s, "0"))   { out = false; return true; }
-    }
-    return false;
-}
-
-static String settings_t::ipStringFrom(JsonVariantConst v) {
-    if (v.is<const char*>()) return String(v.as<const char*>());
-    if (v.is<JsonArrayConst>()) {
-        JsonArrayConst a = v.as<JsonArrayConst>();
-        if (a.size() == 4 && a[0].is<long>() && a[1].is<long>() && a[2].is<long>() && a[3].is<long>()) {
-            return String((int)a[0].as<long>()) + "." + String((int)a[1].as<long>()) + "." + String((int)a[2].as<long>()) + "." + String((int)a[3].as<long>());
-        }
-    }
-    return String();
-}
-
 bool settings_t::Load(const String& configfilename) noexcept {
     LoadDefaults();
 
@@ -499,108 +459,185 @@ bool settings_t::Load(const String& configfilename) noexcept {
     // Log
     if (root["Log"].is<JsonObjectConst>()) {
         JsonObjectConst log = root["Log"].as<JsonObjectConst>();
-        if (log["Endpoint"])      Log.Endpoint((uint8_t) log["Endpoint"].as<long>());
-        if (log["Level"])         Log.LogLevel((uint8_t) log["Level"].as<long>());
-        if (log["Syslog Server"].is<const char*>()) Log.SyslogServerHost(String(log["Syslog Server"].as<const char*>()));
-        uint16_t u16;
-        if (toU16(log["Syslog Port"], u16)) Log.SyslogServerPort(u16);
+        Log.Endpoint((uint8_t)(log["Endpoint"] | Defaults.Log.Endpoint));
+        Log.LogLevel((uint8_t)(log["Level"] | Defaults.Log.Level));
+        Log.SyslogServerHost(String(log["Syslog Server"] | Defaults.Log.SyslogServer));
+        Log.SyslogServerPort((uint16_t)(log["Syslog Port"] | Defaults.Log.SyslogPort));
     }
 
     // Network
     if (root["Network"].is<JsonObjectConst>()) {
         JsonObjectConst net = root["Network"].as<JsonObjectConst>();
-        bool bval; uint16_t u16;
-
-        if (toBool(net["DHCP Client"], bval)) Network.DHCPClient(bval);
-        if (net["Hostname"].is<const char*>()) Network.Hostname(String(net["Hostname"].as<const char*>()));
-
-        String ip;
-        ip = ipStringFrom(net["IP Address"]); if (ip.length()) Network.IP_Address(ip);
-        ip = ipStringFrom(net["Gateway"]);    if (ip.length()) Network.Gateway(ip);
-        ip = ipStringFrom(net["Netmask"]);    if (ip.length()) Network.Netmask(ip);
+        Network.DHCPClient((bool)(net["DHCP Client"] | Defaults.Network.DHCPClient));
+        Network.Hostname(String(net["Hostname"] | Defaults.Network.Hostname()));
+        Network.IP_Address(String(net["IP Address"] | Defaults.Network.IP_Address));
+        Network.Gateway(String(net["Gateway"] | Defaults.Network.Gateway));
+        Network.Netmask(String(net["Netmask"] | Defaults.Network.Netmask));
 
         if (net["DNS Servers"].is<JsonArrayConst>()) {
             JsonArrayConst dns = net["DNS Servers"].as<JsonArrayConst>();
             uint8_t idx = 0;
             for (JsonVariantConst v : dns) {
                 if (idx >= 2) break;
-                String d = ipStringFrom(v);
-                if (d.length()) Network.DNS(idx, d);
-                idx++;
+                Network.DNS(idx, v);
             }
         }
 
-        if (net["SSID"].is<const char*>())       Network.SSID(String(net["SSID"].as<const char*>()));
-        if (net["Passphrase"].is<const char*>()) Network.Passphrase(String(net["Passphrase"].as<const char*>()));
-        if (toU16(net["Connection Timeout"], u16))      Network.ConnectionTimeout(u16);
-        if (toBool(net["Online Checking"], bval))       Network.OnlineChecking(bval);
-        if (toU16(net["Online Checking Timeout"], u16)) Network.OnlineCheckingTimeout(u16);
+        Network.SSID(String(net["SSID"] | Defaults.Network.SSID));
+        Network.Passphrase(String(net["Passphrase"] | Defaults.Network.Passphrase));
+        Network.ConnectionTimeout((uint16_t)(net["Connection Timeout"] | Defaults.Network.ConnectionTimeout));
+        Network.OnlineChecking((uint16_t)(net["Online Checking"] | Defaults.Network.OnlineChecking));
+        Network.OnlineCheckingTimeout((uint16_t)(net["Online Checking Timeout"] | Defaults.Network.OnlineCheckingTimeout));
     }
 
-    // -------------------------
     // Update
-    // -------------------------
     if (root["Update"].is<JsonObjectConst>()) {
         JsonObjectConst up = root["Update"].as<JsonObjectConst>();
-        bool bval; uint16_t u16;
-
-        if (up["Manifest URL"].is<const char*>())   Update.ManifestURL(String(up["Manifest URL"].as<const char*>()));
-        if (toBool(up["Allow Insecure"], bval))     Update.AllowInsecure(bval);
-        if (toBool(up["Enable LAN OTA"], bval))     Update.EnableLANOTA(bval);
-        if (up["Password LAN OTA"].is<const char*>()) Update.PasswordLANOTA(String(up["Password LAN OTA"].as<const char*>()));
-        if (toU16(up["Check Interval"], u16))       Update.CheckInterval(u16);
-        if (toBool(up["Auto Reboot"], bval))        Update.AutoReboot(bval);
-        if (toBool(up["Debug"], bval))              Update.Debug(bval);
-        if (toBool(up["Check At Startup"], bval))   Update.CheckAtStartup(bval);
+        Update.ManifestURL(String(up["Manifest URL"] | Defaults.Update.ManifestURL));
+        Update.AllowInsecure((bool)(up["Allow Insecure"] | Defaults.Update.AllowInsecure));
+        Update.EnableLANOTA((bool)(up["Enable LAN OTA"] | Defaults.Update.EnableLANOTA));
+        Update.PasswordLANOTA(String(up["Password LAN OTA"] | Defaults.Update.PasswordLANOTA));
+        Update.CheckInterval((uint16_t)(up["Check Interval"] | Defaults.Update.CheckInterval));
+        Update.AutoReboot((bool)(up["Auto Reboot"] | Defaults.Update.AutoReboot));
+        Update.Debug((bool)(up["Debug"] | Defaults.Update.Debug));
+        Update.CheckAtStartup((bool)(up["Check At Startup"] | Defaults.Update.CheckAtStartup));
     }
 
-    // -------------------------
     // General
-    // -------------------------
     if (root["General"].is<JsonObjectConst>()) {
         JsonObjectConst gen = root["General"].as<JsonObjectConst>();
-        bool bval;
-        if (toBool(gen["NTP Update"], bval))        General.NTPUpdate(bval);
-        if (gen["NTP Server"].is<const char*>())    General.NTPServer(String(gen["NTP Server"].as<const char*>()));
+        General.NTPUpdate((bool)(gen["NTP Update"] | Defaults.General.NTPUpdate));
+        General.NTPServer(String(gen["NTP Server"] | Defaults.General.NTPServer));
     }
 
-    // -------------------------
     // Orchestrator
-    // -------------------------
     if (root["Orchestrator"].is<JsonObjectConst>()) {
         JsonObjectConst orch = root["Orchestrator"].as<JsonObjectConst>();
-        bool bval;
-        if (toBool(orch["Assigned"], bval))         Orchestrator.Assigned(bval);
-        if (orch["Server ID"].is<const char*>())    Orchestrator.ServerID(String(orch["Server ID"].as<const char*>()));
+        Orchestrator.Assigned((bool)(orch["Assigned"] | Defaults.Orchestrator.Assigned));
+        Orchestrator.ServerID(String(orch["Server ID"] | Defaults.Orchestrator.ServerID));
     }
 
-    // -------------------------
     // WebHooks
-    // -------------------------
     if (root["WebHooks"].is<JsonObjectConst>()) {
         JsonObjectConst wh = root["WebHooks"].as<JsonObjectConst>();
-        bool bval; uint16_t u16;
-        if (toU16(wh["Port"], u16))                 WebHooks.Port(u16);
-        if (toBool(wh["Enabled"], bval))            WebHooks.Enabled(bval);
-        if (wh["Token"].is<const char*>())          WebHooks.Token(String(wh["Token"].as<const char*>()));
+        WebHooks.Port((uint16_t)(wh["Port"] | Defaults.WebHooks.Port));
+        WebHooks.Enabled((bool)(wh["Enabled"] | Defaults.WebHooks.Enabled));
+        WebHooks.Token(String(wh["Token"] | Defaults.WebHooks.Token));
     }
 
-    // -------------------------
     // MQTT
-    // -------------------------
     if (root["MQTT"].is<JsonObjectConst>()) {
         JsonObjectConst mq = root["MQTT"].as<JsonObjectConst>();
-        bool bval; uint16_t u16;
-
-        // aceita "Enabled" OU "Enable"
-        if (toBool(mq["Enabled"], bval) || toBool(mq["Enable"], bval)) MQTT.Enabled(bval);
-
-        if (mq["Broker"].is<const char*>())         MQTT.Broker(String(mq["Broker"].as<const char*>()));
-        if (toU16(mq["Port"], u16))                 MQTT.Port(u16);
-        if (mq["User"].is<const char*>())           MQTT.User(String(mq["User"].as<const char*>()));
-        if (mq["Password"].is<const char*>())       MQTT.Password(String(mq["Password"].as<const char*>()));
+        MQTT.Enabled((bool)(mq["Enabled"] | Defaults.MQTT.Enabled));
+        MQTT.Broker(String(mq["Broker"] | Defaults.MQTT.Broker));
+        MQTT.Port((uint16_t)(mq["Port"] | Defaults.MQTT.Port));
+        MQTT.User(String(mq["User"] | Defaults.MQTT.User));
+        MQTT.Password(String(mq["Password"] | Defaults.MQTT.Password));
     }
 
-    // Components: ignorado aqui (tratar no seu vetor próprio)
-    return true; // carregou e aplicou; ausentes/invalidos ficaram com defaults
+    return true;
+}
+
+bool settings_t::Save(const String& configfilename) const noexcept {
+    const String path = configfilename.length() ? configfilename : String(Defaults.ConfigFileName);
+
+    JsonDocument existingDoc;
+    {
+        File fr = devFileSystem->OpenFile(path, "r");
+        if (fr && fr.available()) {
+            DeserializationError e = deserializeJson(existingDoc, fr);
+            (void)e;
+        }
+        if (fr) fr.close();
+    }
+
+    JsonDocument doc;
+
+    // Log
+    {
+        JsonObject log = doc["Log"].to<JsonObject>();
+        log["Endpoint"] = Log.Endpoint();
+        log["Level"] = Log.LogLevel();
+        log["Syslog Server"] = Log.SyslogServerHost().c_str();
+        log["Syslog Port"] = Log.SyslogServerPort();
+    }
+
+    // Network
+    {
+        JsonObject net = doc["Network"].to<JsonObject>();
+        net["DHCP Client"] = Network.DHCPClient();
+        net["Hostname"] = Network.Hostname().c_str();
+        net["IP Address"] = Network.IP_Address().toString();
+        net["Gateway"] = Network.Gateway().toString();
+        net["Netmask"] = Network.Netmask().toString();
+
+        JsonArray dns = net["DNS Servers"].to<JsonArray>();
+        dns.add(Network.DNS(0).toString());
+        dns.add(Network.DNS(1).toString());
+
+        net["SSID"] = Network.SSID().c_str();
+        net["Passphrase"] = Network.Passphrase().c_str();
+        net["Connection Timeout"] = Network.ConnectionTimeout();
+        net["Online Checking"] = Network.OnlineChecking();
+        net["Online Checking Timeout"] = Network.OnlineCheckingTimeout();
+    }
+
+    // Update
+    {
+        JsonObject up = doc["Update"].to<JsonObject>();
+        up["Manifest URL"] = Update.ManifestURL().c_str();
+        up["Allow Insecure"] = Update.AllowInsecure();
+        up["Enable LAN OTA"] = Update.EnableLANOTA();
+        up["Password LAN OTA"] = Update.PasswordLANOTA().c_str();
+        up["Check Interval"] = Update.CheckInterval();
+        up["Auto Reboot"] = Update.AutoReboot();
+        up["Debug"] = Update.Debug();
+        up["Check At Startup"] = Update.CheckAtStartup();
+    }
+
+    // General
+    {
+        JsonObject gen = doc["General"].to<JsonObject>();
+        gen["NTP Update"] = General.NTPUpdate();
+        gen["NTP Server"] = General.NTPServer().c_str();
+    }
+
+    // Orchestrator
+    {
+        JsonObject orch = doc["Orchestrator"].to<JsonObject>();
+        orch["Assigned"] = Orchestrator.Assigned();
+        orch["Server ID"] = Orchestrator.ServerID().c_str();
+    }
+
+    // WebHooks
+    {
+        JsonObject wh = doc["WebHooks"].to<JsonObject>();
+        wh["Port"] = WebHooks.Port();
+        wh["Enabled"] = WebHooks.Enabled();
+        wh["Token"] = WebHooks.Token().c_str();
+    }
+
+    // MQTT
+    {
+        JsonObject mq = doc["MQTT"].to<JsonObject>();
+        mq["Enabled"] = MQTT.Enabled();
+        mq["Broker"] = MQTT.Broker().c_str();
+        mq["Port"] = MQTT.Port();
+        mq["User"] = MQTT.User().c_str();
+        mq["Password"] = MQTT.Password().c_str();
+    }
+
+    if (existingDoc["Components"].is<JsonArrayConst>()) {
+        doc["Components"] = existingDoc["Components"];
+    } else {
+        (void)doc["Components"].to<JsonArray>();
+    }
+
+    File fw = devFileSystem->OpenFile(path, "w");
+    if (!fw) return false;
+
+    const size_t written = serializeJson(doc, fw);
+    fw.close();
+
+    return written > 0;
 }

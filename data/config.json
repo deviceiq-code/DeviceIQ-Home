@@ -1,59 +1,54 @@
 {
-    "Components": [],
-    "General": {
-        "I2C Bus": false,
-        "NTP Server": "pool.ntp.org",
-        "NTP Update": true
-    },
     "Log": {
-        "Endpoint": 7,
-        "Level": 7,
-        "Syslog Port": 514,
-        "Syslog Server": "192.168.1.251"
-    },
-    "MQTT": {
-        "Broker": "192.168.1.251",
-        "Enable": true,
-        "Password": "deviceiq",
-        "Port": 1883,
-        "User": "deviceiq"
+        "Endpoint": 5,
+        "Level": 255,
+        "Syslog Server": "syslog.svr",
+        "Syslog Port": 514
     },
     "Network": {
-        "Connection Timeout": 30,
         "DHCP Client": true,
-        "DNS Servers": [
-            "192.168.1.251",
-            "192.168.1.250"
-        ],
-        "Gateway": "192.168.1.250",
-        "Hostname": "DEVIQ-LAB",
-        "IP Address": "192.168.2.30",
-        "MAC Address": "D8:13:2A:7E:EE:C4",
+        "IP Address": "0.0.0.0",
+        "Gateway": "0.0.0.0",
         "Netmask": "255.255.255.0",
+        "DNS Servers": [
+            "8.8.8.8",
+            "8.8.4.4"
+        ],
+        "SSID": "",
+        "Passphrase": "",
+        "Connection Timeout": 30,
         "Online Checking": true,
-        "Online Checking Minutes": 1,
-        "Passphrase": "1921682GenesisIOT-2",
-        "SSID": "IOT-2"
+        "Online Checking Timeout": 10
+    },
+    "Update": {
+        "Manifest URL": "https://server.dts-network.com:8081/update.json",
+        "Allow Insecure": false,
+        "Enable LAN OTA": false,
+        "Password LAN OTA": "",
+        "Check Interval": 3600,
+        "Auto Reboot": true,
+        "Debug": false,
+        "Check At Startup": true
+    },
+    "General": {
+        "NTP Update": true,
+        "NTP Server": "pool.ntp.org"
     },
     "Orchestrator": {
-        "Assigned": true,
-        "IP Address": "192.168.2.10",
-        "Port": 30030,
-        "Server ID": "ZCZ95YJJ693UF78"
+        "Assigned": false,
+        "Server ID": ""
     },
-    "Security": {
-        "Security Level": 7,
-        "Users": [
-            {
-                "Admin": true,
-                "Name": "admin",
-                "Password": "admin"
-            },
-            {
-                "Admin": false,
-                "Name": "user",
-                "Password": "user"
-            }
-        ]
-    }
+    "WebHooks": {
+        "Port": 80,
+        "Enabled": false,
+        "Token": ""
+    },
+    "MQTT": {
+        "Enabled": false,
+        "Broker": "",
+        "Port": 1883,
+        "User": "",
+        "Password": ""
+    },
+    "Components": []
 }

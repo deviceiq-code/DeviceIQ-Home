@@ -13,9 +13,6 @@ extern DeviceIQ_FileSystem::FileSystem* devFileSystem;
 
 class settings_t {
     private:
-        bool toU16(JsonVariantConst v, uint16_t& out);
-        bool toBool(JsonVariantConst v, bool& out);
-        static String ipStringFrom(JsonVariantConst v);
     public:
         class log_t {
             private:
@@ -186,7 +183,8 @@ class settings_t {
         } MQTT;
 
         void LoadDefaults();
-        bool Load(const String& configfilename) noexcept;
+        bool Load(const String& configfilename = Defaults.ConfigFileName) noexcept;
+        bool Save(const String& configfilename = Defaults.ConfigFileName) const noexcept;
 };
 
 extern settings_t Settings;

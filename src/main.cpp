@@ -77,7 +77,7 @@ void setup() {
     // Log
     devLog = new Log(devFileSystem, devClock);
     devLog->SerialPort(&Serial);
-    devLog->LogFileName(Defaults.Log.LogFileName);
+    devLog->LogFileName(Defaults.LogFileName);
     devLog->Endpoint(Settings.Log.Endpoint());
     devLog->LogLevel(Settings.Log.LogLevel());
     devLog->SyslogServerHost(Settings.Log.SyslogServerHost());
