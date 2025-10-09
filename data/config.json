@@ -36,7 +36,9 @@
     },
     "Orchestrator": {
         "Assigned": false,
-        "Server ID": ""
+        "Server ID": "",
+        "IP Address": "",
+        "Port": 30300
     },
     "WebHooks": {
         "Port": 80,
