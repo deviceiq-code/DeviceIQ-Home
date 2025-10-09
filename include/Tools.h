@@ -4,14 +4,13 @@
 #pragma once
 
 #include <Arduino.h>
+#include <ArduinoJson.h>
 #include <mbedtls/base64.h>
 #include <ESPAsyncWebServer.h>
-#include <DevIQ_Configuration.h>
 #include <DevIQ_Log.h>
 #include <vector>
 
 using namespace DeviceIQ_Log;
-using namespace DeviceIQ_Configuration;
 
 #define CHECK_BIT(var, pos) ((var) & (1 << (pos - 1)))
 
