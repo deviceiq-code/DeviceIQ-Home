@@ -46,6 +46,8 @@ struct defaults_t {
     struct orchestrator_t {
         const bool Assigned = false;
         const char* ServerID = "";
+        const char* IP_Address = "";
+        const uint16_t Port = 30300;
     } Orchestrator;
     struct webhooks_t {
         const uint16_t Port = 80;

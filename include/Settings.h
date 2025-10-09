@@ -6,15 +6,24 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <DevIQ_FileSystem.h>
+#include <DevIQ_Log.h>
+#include <DevIQ_MQTT.h>
 #include <DevIQ_Components.h>
 
-extern DeviceIQ_FileSystem::FileSystem* devFileSystem;
+using namespace DeviceIQ_FileSystem;
+using namespace DeviceIQ_Log;
+using namespace DeviceIQ_MQTT;
+using namespace DeviceIQ_Components;
+
+extern FileSystem *devFileSystem;
+extern Log *devLog;
+extern MQTT *devMQTT;
 
 #include "Defaults.h"
 
 class settings_t {
     private:
-        void configureComponents(JsonArrayConst components);
+        static void sanitizeIpString(String& s) noexcept;
     public:
         class log_t {
             private:
@@ -49,7 +58,6 @@ class settings_t {
                 bool pOnlineChecking{};
                 uint16_t pOnlineCheckingTimeout;
 
-                static void sanitizeIpString(String& s) noexcept;
                 static bool isValidNetmask(const IPAddress& mask) noexcept;
                 static void stripControlChars(String& s) noexcept;
                 static bool isPrintableASCII(const String& s) noexcept;
@@ -138,12 +146,20 @@ class settings_t {
             private:
                 bool pAssigned{};
                 String pServerID;
+                IPAddress pIP_Address{0,0,0,0};
+                uint16_t pPort{};
             public:
                 [[nodiscard]] bool Assigned() const noexcept { return pAssigned; }
                 void Assigned(bool value) noexcept { pAssigned = value; }
 
                 [[nodiscard]] const String& ServerID() const noexcept { return pServerID; }
                 void ServerID(String value) noexcept;
+
+                [[nodiscard]] const IPAddress& IP_Address() const noexcept { return pIP_Address; }
+                void IP_Address(String value) noexcept;
+
+                [[nodiscard]] uint16_t Port() const noexcept { return pPort; }
+                void Port(uint16_t value) { pPort = (value == 0) ? 30300 : value; }
         } Orchestrator;
         class webhooks_t {
             private:
@@ -184,11 +200,12 @@ class settings_t {
                 void Password(String value) noexcept;
         } MQTT;
 
-        DeviceIQ_Components::Collection Components;
+        Collection Components;
 
         void LoadDefaults();
         bool Load(const String& configfilename = Defaults.ConfigFileName) noexcept;
         bool Save(const String& configfilename = Defaults.ConfigFileName) const noexcept;
+        bool InstallComponents(const String& configfilename = Defaults.ConfigFileName) noexcept;
 };
 
 extern settings_t Settings;

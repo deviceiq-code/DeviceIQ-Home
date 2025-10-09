@@ -3,7 +3,6 @@
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
-#include <DevIQ_Configuration.h>
 #include <DevIQ_FileSystem.h>
 #include <DevIQ_Network.h>
 #include <DevIQ_Log.h>
@@ -15,7 +14,8 @@
 #include <AsyncUDP.h>
 #include <WiFiClient.h>
 
-using namespace DeviceIQ_Configuration;
+#include "Settings.h"
+
 using namespace DeviceIQ_Log;
 using namespace DeviceIQ_DateTime;
 using namespace DeviceIQ_Network;
