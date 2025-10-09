@@ -14,7 +14,7 @@ extern DeviceIQ_FileSystem::FileSystem* devFileSystem;
 
 class settings_t {
     private:
-        void configureComponents(const JsonArrayConst& components);
+        void configureComponents(JsonArrayConst components);
     public:
         class log_t {
             private:

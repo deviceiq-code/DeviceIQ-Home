@@ -1,6 +1,6 @@
 {
     "Log": {
-        "Endpoint": 5,
+        "Endpoint": 7,
         "Level": 255,
         "Syslog Server": "syslog.svr",
         "Syslog Port": 514
@@ -14,8 +14,8 @@
             "8.8.8.8",
             "8.8.4.4"
         ],
-        "SSID": "",
-        "Passphrase": "",
+        "SSID": "IOT-2",
+        "Passphrase": "1921682GenesisIOT-2",
         "Connection Timeout": 30,
         "Online Checking": true,
         "Online Checking Timeout": 10

@@ -544,20 +544,22 @@ bool settings_t::Load(const String& configfilename) noexcept {
     return true;
 }
 
-void settings_t::configureComponents(const JsonArrayConst& components) {
-    if (!components.isNull()) {
-        for (JsonObject comp : components) {
-            const char* name = comp["Name"] | "Unnamed";
-            const char* cls  = comp["Class"] | "Unknown";
-            uint8_t address  = comp["Address"] | 0;
-            bool enabled     = comp["Enabled"] | false;
-            const char* bus  = comp["Bus"] | "Unknown";
+void settings_t::configureComponents(JsonArrayConst components) {
+    // Guard clause
+    if (components.isNull()) {
+        Serial.println(F("No components found in configuration."));
+        return;
+    }
 
-            Serial.printf("Component: %s | Class: %s | Address: %u | Enabled: %s | Bus: %s\n",
-                          name, cls, address, enabled ? "true" : "false", bus);
-        }
-    } else {
-        Serial.println("No components found in configuration.");
+    // Iterate as JsonObjectConst (not JsonObject)
+    for (JsonObjectConst comp : components) {
+        const char* name = comp["Name"]    | "Unnamed";
+        const char* cls  = comp["Class"]   | "Unknown";
+        uint8_t     addr = comp["Address"] | 0;
+        bool        en   = comp["Enabled"] | false;
+        const char* bus  = comp["Bus"]     | "Unknown";
+
+        Serial.printf("Component: %s | Class: %s | Address: %u | Enabled: %s | Bus: %s\n", name, cls, addr, en ? "true" : "false", bus);
     }
 }
 
