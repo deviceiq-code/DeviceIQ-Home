@@ -535,7 +535,30 @@ bool settings_t::Load(const String& configfilename) noexcept {
         MQTT.Password(String(mq["Password"] | Defaults.MQTT.Password));
     }
 
+    // Components
+    if (root["Components"].is<JsonArrayConst>()) {
+        JsonArrayConst cmp = root["Components"].as<JsonArrayConst>();
+        configureComponents(cmp);
+    }
+
     return true;
+}
+
+void settings_t::configureComponents(const JsonArrayConst& components) {
+    if (!components.isNull()) {
+        for (JsonObject comp : components) {
+            const char* name = comp["Name"] | "Unnamed";
+            const char* cls  = comp["Class"] | "Unknown";
+            uint8_t address  = comp["Address"] | 0;
+            bool enabled     = comp["Enabled"] | false;
+            const char* bus  = comp["Bus"] | "Unknown";
+
+            Serial.printf("Component: %s | Class: %s | Address: %u | Enabled: %s | Bus: %s\n",
+                          name, cls, address, enabled ? "true" : "false", bus);
+        }
+    } else {
+        Serial.println("No components found in configuration.");
+    }
 }
 
 bool settings_t::Save(const String& configfilename) const noexcept {

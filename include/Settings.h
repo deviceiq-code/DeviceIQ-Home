@@ -6,6 +6,7 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <DevIQ_FileSystem.h>
+#include <DevIQ_Components.h>
 
 extern DeviceIQ_FileSystem::FileSystem* devFileSystem;
 
@@ -13,6 +14,7 @@ extern DeviceIQ_FileSystem::FileSystem* devFileSystem;
 
 class settings_t {
     private:
+        void configureComponents(const JsonArrayConst& components);
     public:
         class log_t {
             private:
@@ -181,6 +183,8 @@ class settings_t {
                 [[nodiscard]] const String& Password() const noexcept { return pPassword; }
                 void Password(String value) noexcept;
         } MQTT;
+
+        DeviceIQ_Components::Collection Components;
 
         void LoadDefaults();
         bool Load(const String& configfilename = Defaults.ConfigFileName) noexcept;

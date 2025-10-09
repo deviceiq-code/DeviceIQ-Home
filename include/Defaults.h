@@ -60,6 +60,9 @@ class defaults_t {
             const char* User = "";
             const char* Password = "";
         } MQTT;
+        struct components_t {
+            const bool Enabled = true;
+        } Components;
         const char* ConfigFileName = "/config.json";
         const char* LogFileName = "/device.log";
         const uint32_t InitialTimeAndDate = 1708136755;

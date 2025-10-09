@@ -263,7 +263,7 @@ void setup() {
             } break;
         }
 
-        NewComponent->Enabled(devConfiguration->GetAt<bool>("Components", objs, "Enable", Defaults.Components.Enable));
+        NewComponent->Enabled(devConfiguration->GetAt<bool>("Components", objs, "Enable", Defaults.Components.Enabled));
 
         // Components Events
         if (NewComponent) {
