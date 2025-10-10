@@ -24,7 +24,7 @@ extern MQTT *devMQTT;
 class settings_t {
     private:
         bool pFirstRun = false;
-        bool pSaveFlag = false;
+        bool pSaveComponentsStateFlag = false;
         static void sanitizeIpString(String& s) noexcept;
     public:
         class log_t {
@@ -207,8 +207,8 @@ class settings_t {
         } MQTT;
 
         [[nodiscard]] bool FirstRun() const noexcept { return pFirstRun; }
-        [[nodiscard]] bool SaveFlag() const noexcept { return pSaveFlag; }
-        void SetSaveFlag() noexcept { pSaveFlag = true; }
+        [[nodiscard]] bool SaveComponentsStateFlag() const noexcept { return pSaveComponentsStateFlag; }
+        void SetSaveComponentsState() noexcept { pSaveComponentsStateFlag = true; }
 
         Collection Components;
 

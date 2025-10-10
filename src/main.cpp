@@ -422,7 +422,7 @@ void setup() {
 
     devSaveState = new Timer(Settings.General.SaveStatePooling() * 1000);
     devSaveState->OnTimeout([&] {
-        if (Settings.SaveFlag()) {
+        if (Settings.SaveComponentsStateFlag()) {
             if (Settings.SaveComponentsState()) {
                 devLog->Write("Component: States saved successfully (Pooling every " + String(Settings.General.SaveStatePooling())+ " second(s))", LOGLEVEL_INFO);
             } else {

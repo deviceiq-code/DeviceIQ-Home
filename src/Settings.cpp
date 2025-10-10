@@ -618,7 +618,7 @@ bool settings_t::SaveComponentsState(const String& configfilename) noexcept {
     const size_t written = serializeJsonPretty(doc, fw);
     fw.close();
 
-    pSaveFlag = false;
+    pSaveComponentsStateFlag = false;
     return written > 0;
 }
 
@@ -708,7 +708,7 @@ bool settings_t::InstallComponents(const String& configfilename) noexcept {
                         devMQTT->Publish(Network.Hostname() + "/Get/Blinds:" + n->Name() + ":State", String(n->State()));
                     }
 
-                    pSaveFlag = true;
+                    pSaveComponentsStateFlag = true;
                 });
             } break;
 
@@ -759,7 +759,7 @@ bool settings_t::InstallComponents(const String& configfilename) noexcept {
 
                 n->Event["Changed"]([this, n] {
                     if (devMQTT) devMQTT->Publish(Network.Hostname() + "/Get/Relay:" + n->Name(), n->State() ? "on" : "off");
-                    pSaveFlag = true;
+                    pSaveComponentsStateFlag = true;
                 });
             } break;
 
