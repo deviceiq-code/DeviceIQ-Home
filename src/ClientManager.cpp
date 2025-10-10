@@ -85,12 +85,20 @@ void ClientManager::begin() {
 
     auto reply = SendUPD("255.255.255.255", 30030, doc.as<JsonObjectConst>());
     if (!reply.isNull()) {
-        if (reply["Orchestrator"]["Server ID"].as<String>().equalsIgnoreCase(Settings.Orchestrator.ServerID()) && !reply["Orchestrator"]["IP Address"].as<String>().equalsIgnoreCase(Settings.Orchestrator.IP_Address().toString())) {
-            Settings.Orchestrator.IP_Address(reply["Orchestrator"]["IP Address"].as<String>());
-            // Save NOW!
+        if (Settings.Orchestrator.Assigned()) {
+            if (reply["Orchestrator"]["Server ID"].as<String>().equalsIgnoreCase(Settings.Orchestrator.ServerID()) && !reply["Orchestrator"]["IP Address"].as<String>().equalsIgnoreCase(Settings.Orchestrator.IP_Address().toString())) {
+                Settings.Orchestrator.IP_Address(reply["Orchestrator"]["IP Address"].as<String>());
+                Settings.Orchestrator.Port(reply["Orchestrator"]["Port"].as<uint16_t>());
+                Settings.Save();
 
-            devLog->Write("Orchestrator: Server IP address updated to " + Settings.Orchestrator.ServerID(), LOGLEVEL_INFO);
+                devLog->Write("Orchestrator: Server IP address updated to " + Settings.Orchestrator.ServerID(), LOGLEVEL_INFO);
+            }
+        } else {
+            Settings.Orchestrator.IP_Address(reply["Orchestrator"]["IP Address"].as<String>());
+            Settings.Orchestrator.Port(reply["Orchestrator"]["Port"].as<uint16_t>());
+            devLog->Write("Orchestrator: Found server at " + Settings.Orchestrator.IP_Address().toString() + ":" + String(Settings.Orchestrator.Port()), LOGLEVEL_INFO);
         }
+        
     } else {
         devLog->Write("Orchestrator: Server not found in this network", LOGLEVEL_WARNING);
     }
@@ -138,7 +146,15 @@ bool ClientManager::CheckOrchestratorAssignedAndServerID(const JsonObjectConst &
     return true;
 }
 
+bool ClientManager::FindOrchestratorServer() {
+
+}
+
 bool ClientManager::Discover(const JsonVariantConst& cmd) {
+    if (Settings.Orchestrator.IP_Address().toString().isEmpty()) {
+        
+    }
+
     if (connectAndExchangeJson(Settings.Orchestrator.IP_Address(), Settings.Orchestrator.Port(), [&](WiFiClient& client) {
         JsonDocument reply;
         reply["Provider"] = mManagerName;
@@ -181,12 +197,13 @@ bool ClientManager::GetLog(const JsonVariantConst& cmd) {
         size_t fileSize = f.size();
 
         if (connectAndExchangeJson(Settings.Orchestrator.IP_Address(), Settings.Orchestrator.Port(), [&](WiFiClient& client) {
-            StreamFileAsBase64Json(Defaults.LogFileName, devNetwork->MAC_Address(), client, f, fileSize, crc);
+            StreamFileAsBase64Json(Defaults.LogFileName, devNetwork->MAC_Address(), "GetLog", client, f, fileSize, crc);
         })) {
             devLog->Write("Orchestrator: Sent device log file to " + Settings.Orchestrator.IP_Address().toString() + ":" + String(Settings.Orchestrator.Port()), LOGLEVEL_INFO);
             return true;
         } else {
             devLog->Write("Orchestrator: Error sending log file to " + Settings.Orchestrator.IP_Address().toString() + ":" + String(Settings.Orchestrator.Port()), LOGLEVEL_ERROR);
+            return false;
         }
     }
     
@@ -220,19 +237,21 @@ bool ClientManager::ClearLog(const JsonVariantConst& cmd) {
 bool ClientManager::Pull(const JsonVariantConst& cmd) {
     if (!CheckOrchestratorAssignedAndServerID(cmd)) return false;
 
-    if (devFileSystem->Exists(Defaults.LogFileName)) {
-        // Save NOW
+    Settings.Save();
+
+    if (devFileSystem->Exists(Defaults.ConfigFileName)) {
         File f =  devFileSystem->OpenFile(Defaults.ConfigFileName, "r");
         uint32_t crc = CRC32_File(f);
         size_t fileSize = f.size();
 
         if (connectAndExchangeJson(Settings.Orchestrator.IP_Address(), Settings.Orchestrator.Port(), [&](WiFiClient& client) {
-            StreamFileAsBase64Json(Defaults.LogFileName, devNetwork->MAC_Address(), client, f, fileSize, crc);
+            StreamFileAsBase64Json(Defaults.LogFileName, devNetwork->MAC_Address(), "Pull", client, f, fileSize, crc);
         })) {
             devLog->Write("Orchestrator: Sent device config file to " + Settings.Orchestrator.IP_Address().toString() + ":" + String(Settings.Orchestrator.Port()), LOGLEVEL_INFO);
             return true;
         } else {
             devLog->Write("Orchestrator: Error sending config file to " + Settings.Orchestrator.IP_Address().toString() + ":" + String(Settings.Orchestrator.Port()), LOGLEVEL_ERROR);
+            return false;
         }
     }
     
@@ -297,6 +316,8 @@ bool ClientManager::Push(const JsonVariantConst& cmd) {
             return;
         }
 
+        // Aqui tem que arrumar - o arquivo agora vem puro
+
         JsonVariantConst result = doc["Result"];
         if (result.isNull() || !result.is<JsonObjectConst>()) {
             devLog->Write("Orchestrator: Missing or invalid 'Result' field in pushed JSON", LOGLEVEL_ERROR);
@@ -333,36 +354,6 @@ bool ClientManager::Push(const JsonVariantConst& cmd) {
     return false;
 }
 
-void ClientManager::handleAdd(const JsonVariantConst& cmd, IPAddress remoteIp) {
-    if (Settings.Orchestrator.Assigned()) {
-        devLog->Write("Orchestrator: Add request ignored - Device assigned to server ID " + Settings.Orchestrator.ServerID(), LOGLEVEL_WARNING);
-        return;
-    }
-
-    JsonDocument response;
-    response["Orchestrator"]["Server"] = remoteIp.toString();
-    response["Orchestrator"]["Port"] = cmd["Reply Port"] | 30030;
-    response["Orchestrator"]["Status"] = "Added";
-    response["DeviceIQ"]["Product Name"] = Version.ProductName;
-    response["DeviceIQ"]["Hardware Model"] = Version.Hardware.Model;
-    response["DeviceIQ"]["Version"] = Version.Software.Info();
-    response["DeviceIQ"]["Hostname"] = devNetwork->Hostname();
-    response["DeviceIQ"]["MAC Address"] = devNetwork->MAC_Address();
-    response["DeviceIQ"]["IP Address"] = devNetwork->IP_Address();
-
-    Settings.Orchestrator.Assigned(true);
-    Settings.Orchestrator.ServerID(cmd["Server ID"].as<String>());
-    // Save NOW
-
-    connectAndExchangeJson(remoteIp, cmd["Reply Port"] | 30030, [&](WiFiClient& client) {
-        String out;
-        serializeJson(response, out);
-        client.print(out);
-    });
-
-    devLog->Write("Orchestrator: Added assignment to server ID " + Settings.Orchestrator.ServerID(), LOGLEVEL_INFO);
-}
-
 bool ClientManager::Add(const JsonVariantConst& cmd) {
     if (Settings.Orchestrator.Assigned()){
         devLog->Write("Orchestrator: Device already assigned to server ID " + Settings.Orchestrator.ServerID(), LOGLEVEL_ERROR);
@@ -389,7 +380,7 @@ bool ClientManager::Add(const JsonVariantConst& cmd) {
         devLog->Write("Orchestrator: Replied Add command to " + Settings.Orchestrator.IP_Address().toString() + ":" + String(Settings.Orchestrator.Port()), LOGLEVEL_INFO);
         Settings.Orchestrator.Assigned(true);
         Settings.Orchestrator.ServerID(cmd["Server ID"]);
-        // Save NOW
+        Settings.Save();
 
         devLog->Write("Orchestrator: Added assignment to server ID " + Settings.Orchestrator.ServerID(), LOGLEVEL_INFO);
         return true;
@@ -420,7 +411,7 @@ bool ClientManager::Remove(const JsonVariantConst& cmd) {
 
         Settings.Orchestrator.Assigned(false);
         Settings.Orchestrator.ServerID("");
-        // Save NOW
+        Settings.Save();
     })) {
         devLog->Write("Orchestrator: Removed assignment to server ID " + oldServer, LOGLEVEL_INFO);
         return true;
@@ -484,7 +475,9 @@ bool ClientManager::Update(const JsonVariantConst& cmd) {
 bool ClientManager::connectAndExchangeJson(IPAddress remoteIp, uint16_t port, std::function<void(WiFiClient&)> exchange) {
     WiFiClient client;
 
-    if (!client.connect(remoteIp, port)) {
+    client.setTimeout(8000);
+
+    if (!client.connect(remoteIp, port, 8000)) {
         devLog->Write("Orchestrator: Failed to connect to server over TCP", LOGLEVEL_ERROR);
         return false;
     }

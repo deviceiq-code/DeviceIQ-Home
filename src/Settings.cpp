@@ -309,7 +309,7 @@ void settings_t::orchestrator_t::ServerID(String value) noexcept {
 void settings_t::webhooks_t::Token(String value) noexcept {
     value.trim();
 
-    constexpr size_t MIN_LEN = 16;
+    constexpr size_t MIN_LEN = 1;
     constexpr size_t MAX_LEN = 64;
 
     if (value.length() < MIN_LEN || value.length() > MAX_LEN) {
@@ -469,6 +469,7 @@ bool settings_t::Load(const String& configfilename) noexcept {
     File f = devFileSystem->OpenFile(path, "r");
     if (!f || !f.available()) {
         if (f) f.close();
+        pFirstRun = true;
         return false;
     }
 
@@ -549,6 +550,8 @@ bool settings_t::Load(const String& configfilename) noexcept {
         WebHooks.Port((uint16_t)(wh["Port"] | Defaults.WebHooks.Port));
         WebHooks.Enabled((bool)(wh["Enabled"] | Defaults.WebHooks.Enabled));
         WebHooks.Token(String(wh["Token"] | Defaults.WebHooks.Token));
+
+        if (WebHooks.Token().isEmpty()) WebHooks.Enabled(false); // Token must be >= 1 char
     }
 
     // MQTT
@@ -856,9 +859,14 @@ bool settings_t::InstallComponents(const String& configfilename) noexcept {
             comp_id++;
         }
     }
-
-    if (devLog) devLog->Write("Components: " + String(Components.Count()) + " component(s) installed", LOGLEVEL_INFO);
     return true;
+}
+
+void settings_t::RestoreToFactoryDefaults() {
+    devFileSystem->Format();
+    
+    esp_sleep_enable_timer_wakeup(200 * 1000);
+    esp_deep_sleep_start();
 }
 
 bool settings_t::Save(const String& configfilename) const noexcept {
@@ -959,7 +967,7 @@ bool settings_t::Save(const String& configfilename) const noexcept {
     File fw = devFileSystem->OpenFile(path, "w");
     if (!fw) return false;
 
-    const size_t written = serializeJson(doc, fw);
+    const size_t written = serializeJsonPretty(doc, fw);
     fw.close();
 
     return written > 0;

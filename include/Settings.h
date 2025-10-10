@@ -23,6 +23,7 @@ extern MQTT *devMQTT;
 
 class settings_t {
     private:
+        bool pFirstRun{};
         static void sanitizeIpString(String& s) noexcept;
     public:
         class log_t {
@@ -200,9 +201,12 @@ class settings_t {
                 void Password(String value) noexcept;
         } MQTT;
 
+        [[nodiscard]] bool FirstRun() const noexcept { return pFirstRun; }
+
         Collection Components;
 
         void LoadDefaults();
+        void RestoreToFactoryDefaults();
         bool Load(const String& configfilename = Defaults.ConfigFileName) noexcept;
         bool Save(const String& configfilename = Defaults.ConfigFileName) const noexcept;
         bool InstallComponents(const String& configfilename = Defaults.ConfigFileName) noexcept;

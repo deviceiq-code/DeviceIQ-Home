@@ -36,9 +36,8 @@ class ClientManager {
 
         static ClientManager& getInstance();
 
-        void begin();  // call in setup()
+        void begin();
 
-        // bool Add(const JsonVariantConst& cmd);
         bool ClearLog(const JsonVariantConst& cmd);
         bool Discover(const JsonVariantConst& cmd);
         bool GetLog(const JsonVariantConst& cmd);
@@ -55,13 +54,11 @@ class ClientManager {
         bool FindOrchestratorServer();
 
     private:
-        ClientManager() = default;                  // private ctor for singleton
+        ClientManager() = default;
         ClientManager(const ClientManager&) = delete;
         ClientManager& operator=(const ClientManager&) = delete;
 
         void handleUdpPacket(AsyncUDPPacket& packet);
-
-        void handleAdd(const JsonVariantConst& cmd, IPAddress remoteIp);
 
         bool connectAndExchangeJson(IPAddress remoteIp, uint16_t port, std::function<void(WiFiClient&)> exchange);
         

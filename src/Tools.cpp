@@ -84,11 +84,12 @@ bool hasValidHeaderToken(AsyncWebServerRequest *request, String api_token) {
     return false;
 }
 
-bool StreamFileAsBase64Json(String fileName, String macAddress, WiFiClient &client, File &f, size_t fileSize, uint32_t crc32) {
+bool StreamFileAsBase64Json(String fileName, String macAddress, String command, WiFiClient &client, File &f, size_t fileSize, uint32_t crc32) {
     client.setNoDelay(true);
 
-    client.print(F("{\"Provider\":\"Orchestrator\",\"Command\":\"GetLog\",\"Parameter\":{"));
-    client.print(F("\"MAC Address\":\""));
+    client.print(F("{\"Provider\":\"Orchestrator\",\"Command\":\""));
+    client.print(command);
+    client.print(F("\",\"Parameter\":{\"MAC Address\":\""));
     client.print(macAddress);
     client.print(F("\","));
     client.print(F("\"Filename\":\""));

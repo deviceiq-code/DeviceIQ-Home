@@ -7,6 +7,7 @@
     },
     "Network": {
         "DHCP Client": true,
+        "Hostname": "deviq-lab",
         "IP Address": "0.0.0.0",
         "Gateway": "0.0.0.0",
         "Netmask": "255.255.255.0",
@@ -38,12 +39,12 @@
         "Assigned": false,
         "Server ID": "",
         "IP Address": "",
-        "Port": 30300
+        "Port": 30030
     },
     "WebHooks": {
         "Port": 80,
-        "Enabled": false,
-        "Token": ""
+        "Enabled": true,
+        "Token": "token_test"
     },
     "MQTT": {
         "Enabled": false,
