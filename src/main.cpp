@@ -166,12 +166,12 @@ void setup() {
                 }
 
                 // Orchestrator
-                ClientManager::getInstance().begin();
+                Orchestrator::getInstance().begin();
                 if (Settings.Orchestrator.Assigned() && !Settings.Orchestrator.ServerID().isEmpty()) {
                     devLog->Write("Orchestrator: Device assigned to server ID " + Settings.Orchestrator.ServerID(), LOGLEVEL_WARNING);
                     JsonDocument cmd;
                     cmd["Server ID"] = Settings.Orchestrator.ServerID();
-                    ClientManager::getInstance().Refresh(cmd);
+                    Orchestrator::getInstance().Refresh(cmd);
                 } else {
                     devLog->Write("Orchestrator: Device is not assigned to an Orchestrator server", LOGLEVEL_WARNING);
                 }

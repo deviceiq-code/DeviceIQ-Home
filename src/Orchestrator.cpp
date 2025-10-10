@@ -11,9 +11,9 @@ extern Network* devNetwork;
 extern Clock *devClock;
 extern bool g_cmdCheckNow;
 
-ClientManager& ClientManager::getInstance() { static ClientManager instance; return instance; }
+Orchestrator& Orchestrator::getInstance() { static Orchestrator instance; return instance; }
 
-const JsonObjectConst ClientManager::SendUPD(const String &target, const uint16_t port, const JsonObjectConst &payload) {
+const JsonObjectConst Orchestrator::SendUPD(const String &target, const uint16_t port, const JsonObjectConst &payload) {
     s_doc.clear();
 
     if (WiFi.status() != WL_CONNECTED) return JsonObjectConst(); // vazio
@@ -79,7 +79,7 @@ const JsonObjectConst ClientManager::SendUPD(const String &target, const uint16_
     return s_doc.as<JsonObjectConst>();
 }
 
-void ClientManager::begin() {
+void Orchestrator::begin() {
     JsonDocument doc;
     doc["Orchestrator"] = "Discover";
 
@@ -113,7 +113,7 @@ void ClientManager::begin() {
     udp.onPacket([this](AsyncUDPPacket packet) { this->handleUdpPacket(packet); });
 }
 
-void ClientManager::handleUdpPacket(AsyncUDPPacket& packet) {
+void Orchestrator::handleUdpPacket(AsyncUDPPacket& packet) {
     // Debug - print whatever arrives
     // Serial.printf("\r\n---\r\n"); Serial.println((char*)packet.data()); Serial.printf("---\r\n");
 
@@ -139,7 +139,7 @@ void ClientManager::handleUdpPacket(AsyncUDPPacket& packet) {
     else { devLog->Write("Orchestrator: Unknown request [" + request + "]", LOGLEVEL_WARNING); }
 }
 
-bool ClientManager::CheckOrchestratorAssignedAndServerID(const JsonObjectConst &cmd) {
+bool Orchestrator::CheckOrchestratorAssignedAndServerID(const JsonObjectConst &cmd) {
     if (!Settings.Orchestrator.Assigned()) {
         devLog->Write("Orchestrator: Ignoring command - Device is not assigned", LOGLEVEL_WARNING);
         return false;
@@ -153,11 +153,11 @@ bool ClientManager::CheckOrchestratorAssignedAndServerID(const JsonObjectConst &
     return true;
 }
 
-bool ClientManager::FindOrchestratorServer() {
+bool Orchestrator::FindOrchestratorServer() {
 
 }
 
-bool ClientManager::Discover(const JsonVariantConst& cmd) {
+bool Orchestrator::Discover(const JsonVariantConst& cmd) {
     if (Settings.Orchestrator.IP_Address().toString().isEmpty()) {
         
     }
@@ -189,13 +189,13 @@ bool ClientManager::Discover(const JsonVariantConst& cmd) {
     return false;   
 }
 
-bool ClientManager::Refresh(const JsonVariantConst& cmd) {
+bool Orchestrator::Refresh(const JsonVariantConst& cmd) {
     if (!CheckOrchestratorAssignedAndServerID(cmd)) return false;
 
     return Discover(cmd);
 }
 
-bool ClientManager::GetLog(const JsonVariantConst& cmd) {
+bool Orchestrator::GetLog(const JsonVariantConst& cmd) {
     if (!CheckOrchestratorAssignedAndServerID(cmd)) return false;
 
     if (devFileSystem->Exists(Defaults.LogFileName)) {
@@ -218,7 +218,7 @@ bool ClientManager::GetLog(const JsonVariantConst& cmd) {
     return false;
 }
 
-bool ClientManager::ClearLog(const JsonVariantConst& cmd) {
+bool Orchestrator::ClearLog(const JsonVariantConst& cmd) {
     if (!CheckOrchestratorAssignedAndServerID(cmd)) return false;
 
     if (connectAndExchangeJson(Settings.Orchestrator.IP_Address(), Settings.Orchestrator.Port(), [&](WiFiClient& client) {
@@ -241,7 +241,7 @@ bool ClientManager::ClearLog(const JsonVariantConst& cmd) {
     return devLog->Clear();
 }
 
-bool ClientManager::Pull(const JsonVariantConst& cmd) {
+bool Orchestrator::Pull(const JsonVariantConst& cmd) {
     if (!CheckOrchestratorAssignedAndServerID(cmd)) return false;
 
     Settings.Save();
@@ -266,7 +266,7 @@ bool ClientManager::Pull(const JsonVariantConst& cmd) {
     return false;
 }
 
-bool ClientManager::Push(const JsonVariantConst& cmd) {
+bool Orchestrator::Push(const JsonVariantConst& cmd) {
     if (!CheckOrchestratorAssignedAndServerID(cmd)) return false;
 
     fs::File file = devFileSystem->OpenFile(String(Defaults.ConfigFileName) + ".tmp", "w");
@@ -353,7 +353,7 @@ bool ClientManager::Push(const JsonVariantConst& cmd) {
     return false;
 }
 
-bool ClientManager::Add(const JsonVariantConst& cmd) {
+bool Orchestrator::Add(const JsonVariantConst& cmd) {
     if (Settings.Orchestrator.Assigned()){
         devLog->Write("Orchestrator: Device already assigned to server ID " + Settings.Orchestrator.ServerID(), LOGLEVEL_ERROR);
         return false;
@@ -389,7 +389,7 @@ bool ClientManager::Add(const JsonVariantConst& cmd) {
     return false;
 }
 
-bool ClientManager::Restore(const JsonVariantConst& cmd) {
+bool Orchestrator::Restore(const JsonVariantConst& cmd) {
     if (!CheckOrchestratorAssignedAndServerID(cmd)) return false;
 
     if (connectAndExchangeJson(Settings.Orchestrator.IP_Address(), Settings.Orchestrator.Port(), [&](WiFiClient& client) {
@@ -415,7 +415,7 @@ bool ClientManager::Restore(const JsonVariantConst& cmd) {
     return false;
 }
 
-bool ClientManager::Remove(const JsonVariantConst& cmd) {
+bool Orchestrator::Remove(const JsonVariantConst& cmd) {
     if (!CheckOrchestratorAssignedAndServerID(cmd)) return false;
 
     String oldServer = Settings.Orchestrator.ServerID();
@@ -446,7 +446,7 @@ bool ClientManager::Remove(const JsonVariantConst& cmd) {
     return false;
 }
 
-bool ClientManager::Restart(const JsonVariantConst& cmd) {
+bool Orchestrator::Restart(const JsonVariantConst& cmd) {
     if (!CheckOrchestratorAssignedAndServerID(cmd)) return false;
 
     if (connectAndExchangeJson(Settings.Orchestrator.IP_Address(), Settings.Orchestrator.Port(), [&](WiFiClient& client) {
@@ -473,7 +473,7 @@ bool ClientManager::Restart(const JsonVariantConst& cmd) {
     return true;
 }
 
-bool ClientManager::Update(const JsonVariantConst& cmd) {
+bool Orchestrator::Update(const JsonVariantConst& cmd) {
     if (!CheckOrchestratorAssignedAndServerID(cmd)) return false;
 
     if (connectAndExchangeJson(Settings.Orchestrator.IP_Address(), Settings.Orchestrator.Port(), [&](WiFiClient& client) {
@@ -498,7 +498,7 @@ bool ClientManager::Update(const JsonVariantConst& cmd) {
     return false;
 }
 
-bool ClientManager::connectAndExchangeJson(IPAddress remoteIp, uint16_t port, std::function<void(WiFiClient&)> exchange) {
+bool Orchestrator::connectAndExchangeJson(IPAddress remoteIp, uint16_t port, std::function<void(WiFiClient&)> exchange) {
     WiFiClient client;
 
     client.setTimeout(8000);

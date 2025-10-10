@@ -29,12 +29,12 @@ static SemaphoreHandle_t s_sem;
 static String s_rx;
 static IPAddress s_rip;
 
-class ClientManager {
+class Orchestrator {
     public:
         const String mManagerName = "Orchestrator";
         const String mManagerVersion = "1.0.0";
 
-        static ClientManager& getInstance();
+        static Orchestrator& getInstance();
 
         void begin();
 
@@ -55,9 +55,9 @@ class ClientManager {
         bool FindOrchestratorServer();
 
     private:
-        ClientManager() = default;
-        ClientManager(const ClientManager&) = delete;
-        ClientManager& operator=(const ClientManager&) = delete;
+        Orchestrator() = default;
+        Orchestrator(const Orchestrator&) = delete;
+        Orchestrator& operator=(const Orchestrator&) = delete;
 
         void handleUdpPacket(AsyncUDPPacket& packet);
 
