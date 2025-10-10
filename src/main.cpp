@@ -1,6 +1,4 @@
 #include <Arduino.h>
-#include <LittleFS.h>
-#include <Wire.h>
 #include <DevIQ_Network.h>
 #include <DevIQ_Components.h>
 #include <DevIQ_FileSystem.h>

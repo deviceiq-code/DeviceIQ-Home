@@ -1,6 +1,5 @@
 #include "Orchestrator.h"
 
-#include <LittleFS.h>
 #include "Tools.h"
 #include "Version.h"
 
