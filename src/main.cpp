@@ -37,7 +37,10 @@ AsyncWebServer *devWebhook;
 AsyncTelnetServer *devTelnetServer;
 UpdateClient *devUpdateClient;
 
+Timer *devSaveState;
+
 settings_t Settings;
+orchestrator Orchestrator;
 
 volatile bool g_cmdCheckNow = false;
 
@@ -166,12 +169,13 @@ void setup() {
                 }
 
                 // Orchestrator
-                Orchestrator::getInstance().begin();
+                Orchestrator.Begin();
                 if (Settings.Orchestrator.Assigned() && !Settings.Orchestrator.ServerID().isEmpty()) {
                     devLog->Write("Orchestrator: Device assigned to server ID " + Settings.Orchestrator.ServerID(), LOGLEVEL_WARNING);
+                    
                     JsonDocument cmd;
                     cmd["Server ID"] = Settings.Orchestrator.ServerID();
-                    Orchestrator::getInstance().Refresh(cmd);
+                    Orchestrator.Refresh(cmd);
                 } else {
                     devLog->Write("Orchestrator: Device is not assigned to an Orchestrator server", LOGLEVEL_WARNING);
                 }
@@ -415,6 +419,18 @@ void setup() {
         devLog->Write("First Run - New configuration file " + String(Defaults.ConfigFileName) + " saved", LOGLEVEL_INFO);
         Settings.Save();
     }
+
+    devSaveState = new Timer(Settings.General.SaveStatePooling() * 1000);
+    devSaveState->OnTimeout([&] {
+        if (Settings.SaveFlag()) {
+            if (Settings.SaveComponentsState()) {
+                devLog->Write("Component: States saved successfully (Pooling every " + String(Settings.General.SaveStatePooling())+ " second(s))", LOGLEVEL_INFO);
+            } else {
+                devLog->Write("Component: Failed to save states (Pooling every " + String(Settings.General.SaveStatePooling())+ " second(s))", LOGLEVEL_ERROR);
+            }
+        }
+    });
+    devSaveState->Start();
 }
 
 void loop() {
@@ -456,4 +472,6 @@ void loop() {
     }
 
     Settings.Components.Control();
+
+    devSaveState->Control();
 }

@@ -442,6 +442,7 @@ void settings_t::LoadDefaults() {
     // General
     General.NTPUpdate(Defaults.General.NTPUpdate);
     General.NTPServer(Defaults.General.NTPServer);
+    General.SaveStatePooling(Defaults.General.SaveStatePooling);
 
     // Orchestrator
     Orchestrator.Assigned(Defaults.Orchestrator.Assigned);
@@ -534,6 +535,7 @@ bool settings_t::Load(const String& configfilename) noexcept {
         JsonObjectConst gen = root["General"].as<JsonObjectConst>();
         General.NTPUpdate((bool)(gen["NTP Update"] | Defaults.General.NTPUpdate));
         General.NTPServer(String(gen["NTP Server"] | Defaults.General.NTPServer));
+        General.SaveStatePooling((uint32_t)(gen["Save State Pooling"] | Defaults.General.SaveStatePooling));
     }
 
     // Orchestrator
@@ -568,6 +570,58 @@ bool settings_t::Load(const String& configfilename) noexcept {
     return true;
 }
 
+bool settings_t::SaveComponentsState(const String& configfilename) noexcept {
+    const String path = configfilename.length() ? configfilename : String(Defaults.ConfigFileName);
+    File f = devFileSystem->OpenFile(path, "r");
+    if (!f || !f.available()) {
+        if (f) f.close();
+        return false;
+    }
+
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, f);
+    f.close();
+    if (err) return false;
+
+    JsonObject root = doc.as<JsonObject>();
+    if (root.isNull()) return false;
+    
+    JsonArray components = root["Components"].as<JsonArray>();
+
+    if (components.isNull()) return false; // No components found
+
+    auto findComponentObj = [&](String name) -> JsonObject {
+        for (JsonObject obj : components) {
+            const char* jName = obj["Name"] | "";
+            if (name.equalsIgnoreCase(jName)) return obj;
+        }
+        return JsonObject();
+    };
+
+    for (Generic* comp : Components) {
+        JsonObject obj = findComponentObj(comp->Name());
+        if (obj.isNull()) continue;
+
+        switch (comp->Class()) {
+            case CLASS_RELAY : {
+                obj["State"] = comp->as<Relay>()->State();
+            } break;
+            case CLASS_BLINDS : {
+                obj["Position"] = comp->as<Blinds>()->State();
+            } break;
+        }
+    }
+
+    File fw = devFileSystem->OpenFile(path, "w");
+    if (!fw) return false;
+
+    const size_t written = serializeJsonPretty(doc, fw);
+    fw.close();
+
+    pSaveFlag = false;
+    return written > 0;
+}
+
 bool settings_t::InstallComponents(const String& configfilename) noexcept {
     const String path = configfilename.length() ? configfilename : String(Defaults.ConfigFileName);
     File f = devFileSystem->OpenFile(path, "r");
@@ -596,11 +650,11 @@ bool settings_t::InstallComponents(const String& configfilename) noexcept {
     uint8_t comp_id = 0;
 
     for (JsonObjectConst comp : components) {
-        const String comp_name = (comp["Name"] | "");
-        const String comp_class = (comp["Class"] | "");
-        uint8_t comp_address = (comp["Address"] | 0);
-        bool comp_enabled = (comp["Enabled"] | false);
-        String comp_bus = (comp["Bus"] | "");
+        const String comp_name = String(comp["Name"] | "");
+        const String comp_class = String(comp["Class"] | "");
+        uint8_t comp_address = (uint8_t)(comp["Address"] | 0);
+        bool comp_enabled = (bool)(comp["Enabled"] | false);
+        String comp_bus = String(comp["Bus"] | "");
 
         if (comp_name.isEmpty()) {
             if (devLog) devLog->Write("Component: Empty name for component #" + String(comp_id) + " - component not installed", LOGLEVEL_WARNING);
@@ -653,6 +707,8 @@ bool settings_t::InstallComponents(const String& configfilename) noexcept {
                         devMQTT->Publish(Network.Hostname() + "/Get/Blinds:" + n->Name() + ":Position", String(n->Position()));
                         devMQTT->Publish(Network.Hostname() + "/Get/Blinds:" + n->Name() + ":State", String(n->State()));
                     }
+
+                    pSaveFlag = true;
                 });
             } break;
 
@@ -703,7 +759,7 @@ bool settings_t::InstallComponents(const String& configfilename) noexcept {
 
                 n->Event["Changed"]([this, n] {
                     if (devMQTT) devMQTT->Publish(Network.Hostname() + "/Get/Relay:" + n->Name(), n->State() ? "on" : "off");
-                    // :: Save state
+                    pSaveFlag = true;
                 });
             } break;
 
@@ -932,6 +988,7 @@ bool settings_t::Save(const String& configfilename) const noexcept {
         JsonObject gen = doc["General"].to<JsonObject>();
         gen["NTP Update"] = General.NTPUpdate();
         gen["NTP Server"] = General.NTPServer();
+        gen["Save State Pooling"] = General.SaveStatePooling();
     }
 
     // Orchestrator

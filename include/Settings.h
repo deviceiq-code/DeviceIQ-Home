@@ -24,6 +24,7 @@ extern MQTT *devMQTT;
 class settings_t {
     private:
         bool pFirstRun = false;
+        bool pSaveFlag = false;
         static void sanitizeIpString(String& s) noexcept;
     public:
         class log_t {
@@ -136,12 +137,16 @@ class settings_t {
             private:
                 bool pNTPUpdate{};
                 String pNTPServer;
+                uint16_t pSaveStatePooling;
             public:
                 [[nodiscard]] bool NTPUpdate() const noexcept { return pNTPUpdate; }
                 void NTPUpdate(bool value) noexcept { pNTPUpdate = value; }
 
                 [[nodiscard]] const String& NTPServer() const noexcept { return pNTPServer; }
                 void NTPServer(String value) noexcept;
+
+                [[nodiscard]] uint16_t SaveStatePooling() const noexcept { return pSaveStatePooling; }
+                void SaveStatePooling(uint16_t value) { pSaveStatePooling = (value <= 1) ? Defaults.General.SaveStatePooling : value; }
         } General;
         class orchestrator_t {
             private:
@@ -160,7 +165,7 @@ class settings_t {
                 void IP_Address(String value) noexcept;
 
                 [[nodiscard]] uint16_t Port() const noexcept { return pPort; }
-                void Port(uint16_t value) { pPort = (value == 0) ? 30300 : value; }
+                void Port(uint16_t value) { pPort = (value == 0) ? Defaults.Orchestrator.Port : value; }
         } Orchestrator;
         class webhooks_t {
             private:
@@ -202,6 +207,8 @@ class settings_t {
         } MQTT;
 
         [[nodiscard]] bool FirstRun() const noexcept { return pFirstRun; }
+        [[nodiscard]] bool SaveFlag() const noexcept { return pSaveFlag; }
+        void SetSaveFlag() noexcept { pSaveFlag = true; }
 
         Collection Components;
 
@@ -210,6 +217,7 @@ class settings_t {
         bool Load(const String& configfilename = Defaults.ConfigFileName) noexcept;
         bool Save(const String& configfilename = Defaults.ConfigFileName) const noexcept;
         bool InstallComponents(const String& configfilename = Defaults.ConfigFileName) noexcept;
+        bool SaveComponentsState(const String& configfilename = Defaults.ConfigFileName) noexcept;
 };
 
 extern settings_t Settings;

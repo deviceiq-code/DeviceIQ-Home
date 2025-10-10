@@ -23,20 +23,15 @@ using namespace DeviceIQ_DateTime;
 
 enum DiscoveryMode { DISCOVERY_NONE, DISCOVERY_ALL, DISCOVERY_UNMANAGED, DISCOVERY_MANAGED };
 
-static JsonDocument s_doc;
-static AsyncUDP s_udp;
-static SemaphoreHandle_t s_sem;
-static String s_rx;
-static IPAddress s_rip;
+class orchestrator {
+    private:
+        void handleUdpPacket(AsyncUDPPacket& packet);
+        bool connectAndExchangeJson(IPAddress remoteIp, uint16_t port, std::function<void(WiFiClient&)> exchange);
+        bool isManaged(const JsonObjectConst &cmd);
 
-class Orchestrator {
+        AsyncUDP udp;
     public:
-        const String mManagerName = "Orchestrator";
-        const String mManagerVersion = "1.0.0";
-
-        static Orchestrator& getInstance();
-
-        void begin();
+        void Begin();
 
         bool ClearLog(const JsonVariantConst& cmd);
         bool Discover(const JsonVariantConst& cmd);
@@ -53,22 +48,8 @@ class Orchestrator {
         const JsonObjectConst SendUDP(const String &target, const uint16_t port, const JsonObjectConst &payload);
 
         bool FindOrchestratorServer();
-
-    private:
-        Orchestrator() = default;
-        Orchestrator(const Orchestrator&) = delete;
-        Orchestrator& operator=(const Orchestrator&) = delete;
-
-        void handleUdpPacket(AsyncUDPPacket& packet);
-
-        bool connectAndExchangeJson(IPAddress remoteIp, uint16_t port, std::function<void(WiFiClient&)> exchange);
-        
-        bool CheckOrchestratorAssignedAndServerID(const JsonObjectConst &cmd);
-
-        const String &NamagerName() const { return mManagerName; }
-        const String &NamagerVersion() const { return mManagerVersion; }
-
-        AsyncUDP udp;
 };
+
+extern orchestrator Orchestrator;
 
 #endif

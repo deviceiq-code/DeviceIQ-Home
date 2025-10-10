@@ -40,10 +40,12 @@ struct defaults_t {
         const bool CheckAtStartup = true;
     } Update;
     struct general_t {
+        const uint16_t SaveStatePooling = 20;
         const bool NTPUpdate = true;
         const char* NTPServer = "pool.ntp.org";
     } General;
     struct orchestrator_t {
+        const char* Provider = "Orchestrator";
         const bool Assigned = false;
         const char* ServerID = "";
         const char* IP_Address = "";
