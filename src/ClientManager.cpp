@@ -86,7 +86,11 @@ void ClientManager::begin() {
     auto reply = SendUPD("255.255.255.255", 30030, doc.as<JsonObjectConst>());
     if (!reply.isNull()) {
         if (Settings.Orchestrator.Assigned()) {
-            if (reply["Orchestrator"]["Server ID"].as<String>().equalsIgnoreCase(Settings.Orchestrator.ServerID()) && !reply["Orchestrator"]["IP Address"].as<String>().equalsIgnoreCase(Settings.Orchestrator.IP_Address().toString())) {
+            bool ServerID_match = Settings.Orchestrator.ServerID().equalsIgnoreCase(reply["Orchestrator"]["Server ID"].as<String>());
+            bool IPAddress_match = Settings.Orchestrator.IP_Address().toString().equalsIgnoreCase(reply["Orchestrator"]["IP Address"].as<String>());
+            bool Port_match = Settings.Orchestrator.Port() == reply["Orchestrator"]["Port"].as<uint16_t>();
+
+            if (ServerID_match && (!IPAddress_match || !Port_match)) {
                 Settings.Orchestrator.IP_Address(reply["Orchestrator"]["IP Address"].as<String>());
                 Settings.Orchestrator.Port(reply["Orchestrator"]["Port"].as<uint16_t>());
                 Settings.Save();
@@ -96,6 +100,8 @@ void ClientManager::begin() {
         } else {
             Settings.Orchestrator.IP_Address(reply["Orchestrator"]["IP Address"].as<String>());
             Settings.Orchestrator.Port(reply["Orchestrator"]["Port"].as<uint16_t>());
+            Settings.Save();
+            
             devLog->Write("Orchestrator: Found server at " + Settings.Orchestrator.IP_Address().toString() + ":" + String(Settings.Orchestrator.Port()), LOGLEVEL_INFO);
         }
         
@@ -121,6 +127,7 @@ void ClientManager::handleUdpPacket(AsyncUDPPacket& packet) {
     
     if (request == "Discover") { Discover(doc); }
     else if (request == "Restart") { Restart(doc); }
+    else if (request == "Restore") { Restore(doc); }
     else if (request == "Refresh") { Refresh(doc); }
     else if (request == "Add") { Add(doc); }
     else if (request == "Remove") { Remove(doc); }
@@ -245,7 +252,7 @@ bool ClientManager::Pull(const JsonVariantConst& cmd) {
         size_t fileSize = f.size();
 
         if (connectAndExchangeJson(Settings.Orchestrator.IP_Address(), Settings.Orchestrator.Port(), [&](WiFiClient& client) {
-            StreamFileAsBase64Json(Defaults.LogFileName, devNetwork->MAC_Address(), "Pull", client, f, fileSize, crc);
+            StreamFileAsBase64Json(Defaults.ConfigFileName, devNetwork->MAC_Address(), "Pull", client, f, fileSize, crc);
         })) {
             devLog->Write("Orchestrator: Sent device config file to " + Settings.Orchestrator.IP_Address().toString() + ":" + String(Settings.Orchestrator.Port()), LOGLEVEL_INFO);
             return true;
@@ -312,38 +319,30 @@ bool ClientManager::Push(const JsonVariantConst& cmd) {
 
         if (err) {
             devLog->Write("Orchestrator: Failed to parse config JSON from file " + String(err.c_str()), LOGLEVEL_ERROR);
+            return;
+        }
+
+        bool pushedAssigned = (bool)(doc["Result"]["Orchestrator"]["Assigned"] | false);
+        String pushedServerID = String(doc["Result"]["Orchestrator"]["Server ID"] | "");
+
+        if ((pushedAssigned == false) || (Settings.Orchestrator.ServerID().equals(pushedServerID) == false)) {
+            devLog->Write("Orchestrator: Invalid configuration - Push configuration not applied", LOGLEVEL_ERROR);
+            return;
+        }
+
+        if (doc.containsKey("Result")) {
+            File f = devFileSystem->OpenFile(Defaults.ConfigFileName, "w");
+            if (!f) {
+                devLog->Write("Orchestrator: Failed to open file " + String(Defaults.ConfigFileName) + " for writing - Push configuration not applied", LOGLEVEL_ERROR);
+                return;
+            }
+            
+            serializeJson(doc["Result"], f);
+            f.flush();
+            f.close();
             devFileSystem->DeleteFile(String(Defaults.ConfigFileName) + ".tmp");
-            return;
+            devLog->Write("Orchestrator: New config applied and saved - Restarting to apply new settings", LOGLEVEL_INFO);
         }
-
-        // Aqui tem que arrumar - o arquivo agora vem puro
-
-        JsonVariantConst result = doc["Result"];
-        if (result.isNull() || !result.is<JsonObjectConst>()) {
-            devLog->Write("Orchestrator: Missing or invalid 'Result' field in pushed JSON", LOGLEVEL_ERROR);
-            return;
-        }
-
-        JsonObjectConst pushed = result.as<JsonObjectConst>();
-
-        JsonObjectConst pushedOrch = pushed["Orchestrator"];
-        bool pushedAssigned = pushedOrch["Assigned"] | false;
-        String pushedServerID = pushedOrch["Server ID"] | "";
-
-        bool currentAssigned = Settings.Orchestrator.Assigned();
-        String currentServerID = Settings.Orchestrator.ServerID();
-
-        if (currentAssigned && pushedServerID != currentServerID) {
-            devLog->Write("Orchestrator: Rejected pushed config - Server ID mismatch (" + pushedServerID + " vs " + currentServerID + ")", LOGLEVEL_WARNING);
-            return;
-        }
-
-        // devConfiguration->Setting.clear();
-        // devConfiguration->Setting.set(pushed);
-        // devConfiguration->Critical();
-        devLog->Write("Orchestrator: New config applied and saved", LOGLEVEL_INFO);
-
-        devFileSystem->DeleteFile(String(Defaults.ConfigFileName) + ".tmp");
 
         Restart(cmd);
     })) {
@@ -387,6 +386,32 @@ bool ClientManager::Add(const JsonVariantConst& cmd) {
     }
     
     devLog->Write("Orchestrator: Error sending Add ACK to " + Settings.Orchestrator.IP_Address().toString() + ":" + String(Settings.Orchestrator.Port()), LOGLEVEL_ERROR);
+    return false;
+}
+
+bool ClientManager::Restore(const JsonVariantConst& cmd) {
+    if (!CheckOrchestratorAssignedAndServerID(cmd)) return false;
+
+    if (connectAndExchangeJson(Settings.Orchestrator.IP_Address(), Settings.Orchestrator.Port(), [&](WiFiClient& client) {
+        JsonDocument reply;
+        reply["Provider"] = mManagerName;
+        reply["Command"] = "Restore";
+        reply["Parameter"] = "ACK";
+        reply["Hostname"] = devNetwork->Hostname();
+        reply["MAC Address"] = devNetwork->MAC_Address();
+
+        String json;
+        serializeJson(reply, json);
+        client.print(json);
+
+        devLog->Write("Orchestrator: Replied Restore command to " + Settings.Orchestrator.IP_Address().toString() + ":" + String(Settings.Orchestrator.Port()), LOGLEVEL_INFO);
+    })) {
+        devLog->Write("Orchestrator: Device is restoring to factory defaults", LOGLEVEL_INFO);
+        Settings.RestoreToFactoryDefaults();
+        return true;
+    }
+    
+    devLog->Write("Orchestrator: Error sending Restore ACK to " + Settings.Orchestrator.IP_Address().toString() + ":" + String(Settings.Orchestrator.Port()), LOGLEVEL_ERROR);
     return false;
 }
 
@@ -440,7 +465,8 @@ bool ClientManager::Restart(const JsonVariantConst& cmd) {
     } else {
         devLog->Write("Orchestrator: Error sending Restart ACK to " + Settings.Orchestrator.IP_Address().toString() + ":" + String(Settings.Orchestrator.Port()), LOGLEVEL_ERROR);
     }
-    
+
+    Settings.Save();
     esp_sleep_enable_timer_wakeup(200 * 1000);
     esp_deep_sleep_start();
 

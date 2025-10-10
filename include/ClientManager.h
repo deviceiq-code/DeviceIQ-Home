@@ -47,6 +47,7 @@ class ClientManager {
         bool Add(const JsonVariantConst& cmd);
         bool Remove(const JsonVariantConst& cmd);
         bool Restart(const JsonVariantConst& cmd);
+        bool Restore(const JsonVariantConst& cmd);
         bool Update(const JsonVariantConst& cmd);
         
         const JsonObjectConst SendUPD(const String &target, const uint16_t port, const JsonObjectConst &payload);

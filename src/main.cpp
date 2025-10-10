@@ -13,10 +13,6 @@
 #include <WiFiClient.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
-
-#include <AsyncTCP.h>
-#include <AsyncUDP.h>
-
 #include <ESPAsyncWebServer.h>
 
 #include "AsyncTelnetServer.h"
@@ -43,8 +39,6 @@ AsyncWebServer *devWebhook;
 AsyncTelnetServer *devTelnetServer;
 UpdateClient *devUpdateClient;
 
-AsyncUDP devUDP;
-
 settings_t Settings;
 
 volatile bool g_cmdCheckNow = false;
@@ -57,6 +51,9 @@ void setup() {
 
     // FileSystem
     devFileSystem = new FileSystem();
+    if (devFileSystem->Exists(String(Defaults.ConfigFileName) + ".tmp")) {
+        devFileSystem->DeleteFile(String(Defaults.ConfigFileName) + ".tmp"); // Delete any old temporary config file
+    }
 
     // Settings
     Settings.Load();

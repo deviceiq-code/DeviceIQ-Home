@@ -475,6 +475,7 @@ bool settings_t::Load(const String& configfilename) noexcept {
 
     JsonDocument doc;
     DeserializationError err = deserializeJson(doc, f);
+    
     f.close();
     if (err) return false;
 
@@ -889,7 +890,7 @@ bool settings_t::Save(const String& configfilename) const noexcept {
         JsonObject log = doc["Log"].to<JsonObject>();
         log["Endpoint"] = Log.Endpoint();
         log["Level"] = Log.LogLevel();
-        log["Syslog Server"] = Log.SyslogServerHost().c_str();
+        log["Syslog Server"] = Log.SyslogServerHost();
         log["Syslog Port"] = Log.SyslogServerPort();
     }
 
@@ -897,7 +898,7 @@ bool settings_t::Save(const String& configfilename) const noexcept {
     {
         JsonObject net = doc["Network"].to<JsonObject>();
         net["DHCP Client"] = Network.DHCPClient();
-        net["Hostname"] = Network.Hostname().c_str();
+        net["Hostname"] = Network.Hostname();
         net["IP Address"] = Network.IP_Address().toString();
         net["Gateway"] = Network.Gateway().toString();
         net["Netmask"] = Network.Netmask().toString();
@@ -906,8 +907,8 @@ bool settings_t::Save(const String& configfilename) const noexcept {
         dns.add(Network.DNS(0).toString());
         dns.add(Network.DNS(1).toString());
 
-        net["SSID"] = Network.SSID().c_str();
-        net["Passphrase"] = Network.Passphrase().c_str();
+        net["SSID"] = Network.SSID();
+        net["Passphrase"] = Network.Passphrase();
         net["Connection Timeout"] = Network.ConnectionTimeout();
         net["Online Checking"] = Network.OnlineChecking();
         net["Online Checking Timeout"] = Network.OnlineCheckingTimeout();
@@ -916,10 +917,10 @@ bool settings_t::Save(const String& configfilename) const noexcept {
     // Update
     {
         JsonObject up = doc["Update"].to<JsonObject>();
-        up["Manifest URL"] = Update.ManifestURL().c_str();
+        up["Manifest URL"] = Update.ManifestURL();
         up["Allow Insecure"] = Update.AllowInsecure();
         up["Enable LAN OTA"] = Update.EnableLANOTA();
-        up["Password LAN OTA"] = Update.PasswordLANOTA().c_str();
+        up["Password LAN OTA"] = Update.PasswordLANOTA();
         up["Check Interval"] = Update.CheckInterval();
         up["Auto Reboot"] = Update.AutoReboot();
         up["Debug"] = Update.Debug();
@@ -930,14 +931,16 @@ bool settings_t::Save(const String& configfilename) const noexcept {
     {
         JsonObject gen = doc["General"].to<JsonObject>();
         gen["NTP Update"] = General.NTPUpdate();
-        gen["NTP Server"] = General.NTPServer().c_str();
+        gen["NTP Server"] = General.NTPServer();
     }
 
     // Orchestrator
     {
         JsonObject orch = doc["Orchestrator"].to<JsonObject>();
         orch["Assigned"] = Orchestrator.Assigned();
-        orch["Server ID"] = Orchestrator.ServerID().c_str();
+        orch["Server ID"] = Orchestrator.ServerID();
+        orch["IP Address"] = Orchestrator.IP_Address().toString();
+        orch["Port"] = Orchestrator.Port();
     }
 
     // WebHooks
@@ -945,17 +948,17 @@ bool settings_t::Save(const String& configfilename) const noexcept {
         JsonObject wh = doc["WebHooks"].to<JsonObject>();
         wh["Port"] = WebHooks.Port();
         wh["Enabled"] = WebHooks.Enabled();
-        wh["Token"] = WebHooks.Token().c_str();
+        wh["Token"] = WebHooks.Token();
     }
 
     // MQTT
     {
         JsonObject mq = doc["MQTT"].to<JsonObject>();
         mq["Enabled"] = MQTT.Enabled();
-        mq["Broker"] = MQTT.Broker().c_str();
+        mq["Broker"] = MQTT.Broker();
         mq["Port"] = MQTT.Port();
-        mq["User"] = MQTT.User().c_str();
-        mq["Password"] = MQTT.Password().c_str();
+        mq["User"] = MQTT.User();
+        mq["Password"] = MQTT.Password();
     }
 
     if (existingDoc["Components"].is<JsonArrayConst>()) {

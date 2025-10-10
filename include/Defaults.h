@@ -23,8 +23,8 @@ struct defaults_t {
         const char* Gateway = "0.0.0.0";
         const char* Netmask = "255.255.255.0";
         const char* DNS[2] = { "8.8.8.8", "8.8.4.4" };
-        const char* SSID = "";
-        const char* Passphrase = "";
+        const char* SSID = "IOT-2";
+        const char* Passphrase = "1921682GenesisIOT-2";
         const uint16_t ConnectionTimeout = 30;
         const bool OnlineChecking = true;
         const uint16_t OnlineCheckingTimeout = 10;
