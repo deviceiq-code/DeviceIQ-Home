@@ -1,5 +1,5 @@
-#ifndef CLIENT_MANAGER_H
-#define CLIENT_MANAGER_H
+#ifndef Orchestrator_H
+#define Orchestrator_H
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
