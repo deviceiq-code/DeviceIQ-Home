@@ -510,7 +510,6 @@ bool orchestrator::Restart(const JsonVariantConst& cmd) {
         devLog->Write("Orchestrator: Error sending Restart ACK to " + Settings.Orchestrator.IP_Address().toString() + ":" + String(Settings.Orchestrator.Port()), LOGLEVEL_ERROR);
     }
 
-    Settings.Save();
     esp_sleep_enable_timer_wakeup(200 * 1000);
     esp_deep_sleep_start();
 
