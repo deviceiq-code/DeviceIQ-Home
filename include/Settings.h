@@ -23,7 +23,7 @@ extern MQTT *devMQTT;
 
 class settings_t {
     private:
-        bool pFirstRun{};
+        bool pFirstRun = false;
         static void sanitizeIpString(String& s) noexcept;
     public:
         class log_t {

@@ -18,7 +18,7 @@ struct defaults_t {
     } Log;
     struct network_t {
         const bool DHCPClient = true;
-        String Hostname() const { uint8_t mac[6]; esp_read_mac(mac, ESP_MAC_WIFI_STA); char buf[12]; snprintf(buf, sizeof(buf), "DEV-%02X%02X%02X", mac[3], mac[4], mac[5]); return String(buf); }
+        String Hostname() const { uint8_t mac[6]; esp_read_mac(mac, ESP_MAC_WIFI_STA); char buf[12]; snprintf(buf, sizeof(buf), "dev-%02X%02X%02X", mac[3], mac[4], mac[5]); return String(buf); }
         const char* IP_Address = "0.0.0.0";
         const char* Gateway = "0.0.0.0";
         const char* Netmask = "255.255.255.0";

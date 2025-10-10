@@ -76,11 +76,6 @@ void setup() {
 
     devLog->Write(Version.ProductFamily + " " + Version.Software.Info(), LOGLEVEL_INFO);
 
-    if (Settings.FirstRun()) {
-        devLog->Write("First Run - New configuration file " + String(Defaults.ConfigFileName) + " saved", LOGLEVEL_INFO);
-        Settings.Save();
-    }
-
     // MQTT
     devMQTT = new MQTT();
 
@@ -420,6 +415,11 @@ void setup() {
     });
 
     devNetwork->Connect();
+
+    if (Settings.FirstRun()) {
+        devLog->Write("First Run - New configuration file " + String(Defaults.ConfigFileName) + " saved", LOGLEVEL_INFO);
+        Settings.Save();
+    }
 }
 
 void loop() {
