@@ -50,7 +50,7 @@ class Orchestrator {
         bool Restore(const JsonVariantConst& cmd);
         bool Update(const JsonVariantConst& cmd);
         
-        const JsonObjectConst SendUPD(const String &target, const uint16_t port, const JsonObjectConst &payload);
+        const JsonObjectConst SendUDP(const String &target, const uint16_t port, const JsonObjectConst &payload);
 
         bool FindOrchestratorServer();
 

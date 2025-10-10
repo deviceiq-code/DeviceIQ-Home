@@ -13,7 +13,7 @@ extern bool g_cmdCheckNow;
 
 Orchestrator& Orchestrator::getInstance() { static Orchestrator instance; return instance; }
 
-const JsonObjectConst Orchestrator::SendUPD(const String &target, const uint16_t port, const JsonObjectConst &payload) {
+const JsonObjectConst Orchestrator::SendUDP(const String &target, const uint16_t port, const JsonObjectConst &payload) {
     s_doc.clear();
 
     if (WiFi.status() != WL_CONNECTED) return JsonObjectConst(); // vazio
@@ -80,36 +80,13 @@ const JsonObjectConst Orchestrator::SendUPD(const String &target, const uint16_t
 }
 
 void Orchestrator::begin() {
-    JsonDocument doc;
-    doc["Orchestrator"] = "Discover";
+    FindOrchestratorServer();
 
-    auto reply = SendUPD("255.255.255.255", 30030, doc.as<JsonObjectConst>());
-    if (!reply.isNull()) {
-        if (Settings.Orchestrator.Assigned()) {
-            bool ServerID_match = Settings.Orchestrator.ServerID().equalsIgnoreCase(reply["Orchestrator"]["Server ID"].as<String>());
-            bool IPAddress_match = Settings.Orchestrator.IP_Address().toString().equalsIgnoreCase(reply["Orchestrator"]["IP Address"].as<String>());
-            bool Port_match = Settings.Orchestrator.Port() == reply["Orchestrator"]["Port"].as<uint16_t>();
-
-            if (ServerID_match && (!IPAddress_match || !Port_match)) {
-                Settings.Orchestrator.IP_Address(reply["Orchestrator"]["IP Address"].as<String>());
-                Settings.Orchestrator.Port(reply["Orchestrator"]["Port"].as<uint16_t>());
-                Settings.Save();
-
-                devLog->Write("Orchestrator: Server IP address updated to " + Settings.Orchestrator.ServerID(), LOGLEVEL_INFO);
-            }
-        } else {
-            Settings.Orchestrator.IP_Address(reply["Orchestrator"]["IP Address"].as<String>());
-            Settings.Orchestrator.Port(reply["Orchestrator"]["Port"].as<uint16_t>());
-            Settings.Save();
-            
-            devLog->Write("Orchestrator: Found server at " + Settings.Orchestrator.IP_Address().toString() + ":" + String(Settings.Orchestrator.Port()), LOGLEVEL_INFO);
-        }
-        
-    } else {
-        devLog->Write("Orchestrator: Server not found in this network", LOGLEVEL_WARNING);
+    if (!udp.listen(Defaults.Orchestrator.Port)) {
+        devLog->Write("Orchestrator: Failed to start UDP listener on port " + String(Defaults.Orchestrator.Port), LOGLEVEL_ERROR);
+        return;
     }
-
-    if (!udp.listen(30030)) { devLog->Write("Orchestrator: Failed to start UDP listener on port 30030", LOGLEVEL_ERROR); return; }
+    
     udp.onPacket([this](AsyncUDPPacket packet) { this->handleUdpPacket(packet); });
 }
 
@@ -154,8 +131,73 @@ bool Orchestrator::CheckOrchestratorAssignedAndServerID(const JsonObjectConst &c
 }
 
 bool Orchestrator::FindOrchestratorServer() {
+    StaticJsonDocument<96> out;
+    out["Orchestrator"] = "Discover";
 
+    JsonVariantConst reply = SendUDP("255.255.255.255", Defaults.Orchestrator.Port, out.as<JsonObjectConst>());
+    if (reply.isNull()) {
+        devLog->Write("Orchestrator: Server not found in this network", LOGLEVEL_WARNING);
+        return false;
+    }
+
+    JsonObjectConst orch = reply["Orchestrator"];
+    if (orch.isNull()) {
+        devLog->Write("Orchestrator: Invalid discovery reply (missing 'Orchestrator' object)", LOGLEVEL_WARNING);
+        return false;
+    }
+
+    const String sid = String(orch["Server ID"] | "");
+    const String ipStr = String(orch["IP Address"]| "");
+    const uint16_t port = (uint16_t)(orch["Port"] | Defaults.Orchestrator.Port);
+
+    if (sid.isEmpty() || ipStr.isEmpty() || port == 0) {
+        devLog->Write("Orchestrator: Invalid discovery reply (missing fields)", LOGLEVEL_WARNING);
+        return false;
+    }
+
+    IPAddress ip;
+    if (!ip.fromString(ipStr)) {
+        devLog->Write("Orchestrator: Invalid IP address in discovery reply: " + ipStr, LOGLEVEL_WARNING);
+        return false;
+    }
+
+    bool changed = false;
+
+    if (Settings.Orchestrator.Assigned()) {
+        const bool sidMatch = Settings.Orchestrator.ServerID().equalsIgnoreCase(sid);
+        if (!sidMatch) {
+            devLog->Write("Orchestrator: Ignoring discovery from different Server ID [" + sid + "]", LOGLEVEL_WARNING);
+            return false;
+        }
+
+        if (Settings.Orchestrator.IP_Address() != ip) {
+            Settings.Orchestrator.IP_Address(ipStr);
+            changed = true;
+        }
+        if (Settings.Orchestrator.Port() != port) {
+            Settings.Orchestrator.Port(port);
+            changed = true;
+        }
+
+        if (changed) {
+            Settings.Save();
+            devLog->Write("Orchestrator: Server endpoint updated to " + ip.toString() + ":" + String(port), LOGLEVEL_INFO);
+        }
+        return true;
+    }
+
+    if (Settings.Orchestrator.ServerID().isEmpty() || !Settings.Orchestrator.Assigned()) {
+        Settings.Orchestrator.ServerID(sid);
+        Settings.Orchestrator.IP_Address(ipStr);
+        Settings.Orchestrator.Port(port);
+        Settings.Save();
+        devLog->Write("Orchestrator: Found server " + sid + " at " + ip.toString() + ":" + String(port), LOGLEVEL_INFO);
+        return true;
+    }
+
+    return true;
 }
+
 
 bool Orchestrator::Discover(const JsonVariantConst& cmd) {
     if (Settings.Orchestrator.IP_Address().toString().isEmpty()) {
