@@ -5,40 +5,36 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link id="css" rel="stylesheet" type="text/css" href="res/css/newstyles.css" />
-    <style>
-        .center-box {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            background-color: var(--color-bg);
-        }
-
-        .content-box {
-            width: 300px;
-            padding: 2rem;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px hsl(0 0% 0% / 0.1);
-            background: hsl(0, 0%, 100%);
-        }
-    </style>
     <title>%PRODUCTNAME%</title>
 </head>
 
 <body>
-    <div class="center-box">
-        <div class="content-box">
-            <form class="login-form">
+    <div class="login">
+        <div class="login left">
+            <h1>%PRODUCTNAME%</h1>
+            <form>
                 <div class="input-style-1">
-                    <input type="text" id="username" name="Username" required autofocus>
                     <label for="username">Email or Username</label>
+                    <input type="text" id="username" placeholder="" required>
                 </div>
                 <div class="input-style-1">
-                    <input type="password" id="password" name="Password" required>
                     <label for="password">Password</label>
+                    <input type="password" id="password" placeholder="" required>
                 </div>
-                <button class="button-style-1" type="submit">Sign In</button>
+                <div class="checkbox-style-1">
+                    <input type="checkbox" id="remember">
+                    <label for="remember">Remember my credentials</label>
+                </div>
+                <button type="submit" class="button-style-1">Sign In</button>
             </form>
+        </div>
+        <div class="login right">
+            <div class="login right top">
+                <img src="res/img/logo.png" alt="DeviceIQ">
+            </div>
+            <div class="login right bottom">
+                <h1>%PRODUCTNAME%</h1>
+            </div>
         </div>
     </div>
 </body>
