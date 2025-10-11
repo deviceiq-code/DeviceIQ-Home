@@ -39,7 +39,8 @@ html, body {
   margin-top: 1.5rem;
 }
 
-.input-style-1 input[type="text"] {
+.input-style-1 input[type="text"],
+.input-style-1 input[type="password"] {
   width: 100%;
   border: none;
   border-bottom: 2px solid var(--color-text);
@@ -62,7 +63,8 @@ html, body {
 }
 
 /* Hover: lighten border and label together */
-.input-style-1:hover input[type="text"] {
+.input-style-1:hover input[type="text"],
+.input-style-1:hover input[type="password"] {
   border-bottom-color: var(--color-text-light);
 }
 
@@ -71,19 +73,23 @@ html, body {
 }
 
 /* Focus: accent color for both border and label */
-.input-style-1 input[type="text"]:focus {
+.input-style-1 input[type="text"]:focus,
+.input-style-1 input[type="password"]:focus {
   border-bottom-color: var(--color-accent);
 }
 
 .input-style-1 input[type="text"]:focus + label,
-.input-style-1 input[type="text"]:not(:placeholder-shown) + label {
+.input-style-1 input[type="password"]:focus + label,
+.input-style-1 input[type="text"]:not(:placeholder-shown) + label,
+.input-style-1 input[type="password"]:not(:placeholder-shown) + label {
   top: -0.75rem;
   font-size: 0.75rem;
   color: var(--color-accent);
 }
 
 /* Sync label color with input border when inactive */
-.input-style-1 input[type="text"]:not(:focus) + label {
+.input-style-1 input[type="text"]:not(:focus) + label,
+.input-style-1 input[type="password"]:not(:focus) + label {
   color: var(--color-text);
 }
 
