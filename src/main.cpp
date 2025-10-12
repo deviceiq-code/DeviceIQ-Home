@@ -33,7 +33,7 @@ Clock *devClock;
 Log *devLog;
 MQTT *devMQTT;
 Network *devNetwork;
-AsyncWebServer *devWebhook;
+AsyncWebServer *devWebServer;
 AsyncTelnetServer *devTelnetServer;
 UpdateClient *devUpdateClient;
 
@@ -180,10 +180,14 @@ void setup() {
                     devLog->Write("Orchestrator: Device is not assigned to an Orchestrator server", LOGLEVEL_WARNING);
                 }
 
-                // Webhooks/MQTT
+                // WebServer/MQTT
                 if (!interfacesRegistered) {
-                    devWebhook = new AsyncWebServer(Settings.WebHooks.Port());
-                    devWebhook->onNotFound([](AsyncWebServerRequest *request) { request->send(404); });
+                    devWebServer = new AsyncWebServer(Settings.WebHooks.Port());
+                    
+                    devWebServer->onNotFound([](AsyncWebServerRequest *request) { request->send(404); });
+                    devWebServer->on("/res/css/styles.css", HTTP_GET, [&](AsyncWebServerRequest *request) { Web_Content("/res/css/styles.css", "text/css", request, false, true); });
+                    devWebServer->on("/res/img/logo.png", HTTP_GET, [&](AsyncWebServerRequest *request) { Web_Content("/res/img/logo.png", "image/png", request, false, true); });
+                    devWebServer->on("/login.html", HTTP_GET, [&](AsyncWebServerRequest *request) { Web_Content("/login.html", "text/html", request, false); });
 
                     // Webhooks
                     if (Settings.WebHooks.Enabled()) {
@@ -191,7 +195,7 @@ void setup() {
                             switch (m->Class()) {
 
                                 case CLASS_RELAY: {
-                                    devWebhook->on(String("/" + m->Name()).c_str(), HTTP_GET, [=](AsyncWebServerRequest *request) {
+                                    devWebServer->on(String("/" + m->Name()).c_str(), HTTP_GET, [=](AsyncWebServerRequest *request) {
                                         JsonDocument reply;
                                         String json;
 
@@ -239,53 +243,53 @@ void setup() {
                                 } break;
 
                                 case CLASS_PIR : {
-                                    registerEndpoint(devWebhook, m, "PIR", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
+                                    registerEndpoint(devWebServer, m, "PIR", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
                                         reply["Motion"] = comp->as<PIR>()->State();
                                     }, Settings.WebHooks.Token(), devLog);
                                 } break;
 
                                 case CLASS_BUTTON: {
-                                    registerEndpoint(devWebhook, m, "Button", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
+                                    registerEndpoint(devWebServer, m, "Button", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
                                         reply["Pressed"] = comp->as<Button>()->IsPressed();
                                     }, Settings.WebHooks.Token(), devLog);
                                 } break;
 
                                 case CLASS_CURRENTMETER: {
-                                    registerEndpoint(devWebhook, m, "Currentmeter", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
+                                    registerEndpoint(devWebServer, m, "Currentmeter", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
                                         reply["Current AC"] = comp->as<Currentmeter>()->CurrentAC();
                                         reply["Current DC"] = comp->as<Currentmeter>()->CurrentDC();
                                     }, Settings.WebHooks.Token(), devLog);
                                 } break;
 
                                 case CLASS_THERMOMETER: {
-                                    registerEndpoint(devWebhook, m, "Thermometer", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
+                                    registerEndpoint(devWebServer, m, "Thermometer", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
                                         reply["Humidity"] = comp->as<Thermometer>()->Humidity();
                                         reply["Temperature"] = comp->as<Thermometer>()->Temperature();
                                     }, Settings.WebHooks.Token(), devLog);
                                 } break;
 
                                 case CLASS_BLINDS: {
-                                    registerEndpoint(devWebhook, m, "Blinds", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
+                                    registerEndpoint(devWebServer, m, "Blinds", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
                                         reply["Position"] = comp->as<Blinds>()->Position();
                                         reply["State"] = comp->as<Blinds>()->State() == BlindsStates::BLINDSSTATE_DECREASING ? "Decreasing" : (comp->as<Blinds>()->State() == BlindsStates::BLINDSSTATE_INCREASING ? "Increasing" : "Stopped");
                                     }, Settings.WebHooks.Token(), devLog);
                                 } break;
 
                                 case CLASS_DOORBELL: {
-                                    registerEndpoint(devWebhook, m, "Doorbell", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
+                                    registerEndpoint(devWebServer, m, "Doorbell", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
                                         reply["State"] = comp->as<Doorbell>()->State();
                                     }, Settings.WebHooks.Token(), devLog);
                                 } break;
 
                                 case CLASS_CONTACTSENSOR: {
-                                    registerEndpoint(devWebhook, m, "ContactSensor", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
+                                    registerEndpoint(devWebServer, m, "ContactSensor", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
                                         reply["State"] = comp->as<ContactSensor>()->State();
                                     }, Settings.WebHooks.Token(), devLog);
                                 } break;
                             }
                         }
 
-                        devWebhook->begin();
+                        devWebServer->begin();
                         devLog->Write("Webhooks: Enabled on port " + String(Settings.WebHooks.Port()), LOGLEVEL_INFO);
                     } else {
                         devLog->Write("Webhooks: Disabled", LOGLEVEL_INFO);

@@ -1,5 +1,10 @@
 #include "Tools.h"
 
+#include "Tools.h"
+#include "Version.h"
+
+extern settings_t Settings;
+
 String CharArrayPointerToString(char* Text, uint32_t length) {
     String tmpRet;
     for (uint32_t i = 0; i < length; i++) tmpRet += (char)Text[i];
@@ -184,4 +189,31 @@ uint32_t CRC32_File(File &f) {
     }
     f.seek(0);
     return crc;
+}
+
+void Web_Content(String content, String mimetype, AsyncWebServerRequest *request, bool requires_authentication, bool static_content) {
+    // if (requires_authentication) Web_HandleAuthentication(request);
+
+    if (static_content) {
+        request->send(LittleFS, content, mimetype, false);
+    } else {
+        request->send(LittleFS, content, mimetype, false, [&](const String &var) {
+            if (var.equalsIgnoreCase("VERSION")) {
+                return Version.Software.Info();
+            }
+            if (var.equalsIgnoreCase("PRODUCTFAMILY")) {
+                return Version.ProductFamily;
+            }
+            if (var.equalsIgnoreCase("PRODUCTNAME")) {
+                return Version.ProductName;
+            }
+            if (var.equalsIgnoreCase("HOSTNAME")) {
+                return Settings.Network.Hostname();
+            }
+
+            return String();
+        });
+    }
+
+    devLog->Write("HTTP Server: " + content + " sent to " + request->client()->remoteIP().toString(), LOGLEVEL_INFO);
 }

@@ -10,6 +10,8 @@
 #include <DevIQ_Log.h>
 #include <vector>
 
+#include "Settings.h"
+
 using namespace DeviceIQ_Log;
 
 #define CHECK_BIT(var, pos) ((var) & (1 << (pos - 1)))
@@ -63,5 +65,7 @@ void registerEndpoint(AsyncWebServer* server, TComponent component, const char* 
 bool StreamFileAsBase64Json(String fileName, String macAddress, String command, WiFiClient &client, File &f, size_t fileSize, uint32_t crc32);
 uint32_t CRC32_Update(uint32_t crc, const uint8_t* data, size_t len);
 uint32_t CRC32_File(File& f);
+
+void Web_Content(String content, String mimetype, AsyncWebServerRequest *request, bool requires_authentication, bool static_content = false);
 
 #endif

@@ -1,45 +1,48 @@
 <html lang="en">
-    <head>
-        <meta charset="utf-8">
-        <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <link id="css" rel="stylesheet" type="text/css" href="res/css/styles.css" />
-        <title>%PRODUCTNAME%</title>
-    </head>
-    <body>
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link id="css" rel="stylesheet" type="text/css" href="res/css/styles.css" />
+    <title>%PRODUCTNAME%</title>
+</head>
+
+<body>
+    <div class="login">
         <div class="login left">
-            <form action="/login.cgi" method="post">
-                <table id="Device_Content" class="table">
-                    <tr><td colspan="2"><div class="title normal">%PRODUCTNAME%</div></td></tr>
-                    <tr class="blankrow"></tr>
-                    <tr><td><label class="toplabel">Email or Username<input class="textbox clear allwidth toplabel" type="text" name="username" required autofocus /></label></td></tr>
-                    <tr><td><label class="toplabel">Password<input class="textbox clear allwidth toplabel" type="password" name="password" required /></label></td></tr>
-                    <tr class="blankrow"></tr>
-                    <tr><td><label class="label"><input class="checkbox" type="checkbox" />Remember my credentials</label></td></tr>
-                    <tr class="blankrow"></tr>
-                    <tr><td><div id="message" style="display:none;"></div></td></tr>
-                    <tr><td><button class="button" type="submit">Sign In</button></td></tr>
-                </table>
-            </form>
+            <div class="login left top">
+                <h2>%PRODUCTFAMILY% %PRODUCTNAME%</h2>
+                <form>
+                    <div class="style-1">
+                        <label for="username">Email or Username</label>
+                        <input type="text" id="username" placeholder="" required>
+                    </div>
+                    <div class="style-1">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" placeholder="" required>
+                    </div>
+                    <div class="checkbox-style-1">
+                        <input type="checkbox" id="remember">
+                        <label for="remember">Remember my credentials</label>
+                    </div>
+                    <button type="submit" class="button-style-1">Sign In</button>
+                </form>
+            </div>
+            <div class="login left bottom">
+                <label>Version %VERSION%</label>
+                <label>%HOSTNAME% | %MAC%</label>
+            </div>
         </div>
         <div class="login right">
-            <div class="login right top"><img id="devicelogo" src="res/img/logo.png" /></div>
-            <div class="login right bottom">%PRODUCTNAME%</div>
+            <div class="login right top">
+                <img src="res/img/logo.png" alt="DeviceIQ">
+            </div>
+            <div class="login right bottom">
+                <h1>%PRODUCTFAMILY% %PRODUCTNAME%</h1>
+            </div>
         </div>
-    </body>
-    <script>
-        function GetURLParameter(Parameter) {
-            var PageURL = window.location.search.substring(1);
-            var URLVariables = PageURL.split('&');
-            for (var i = 0; i < URLVariables.length; i++) {
-                var ParameterName = URLVariables[i].split('=');
-                if (ParameterName[0] == Parameter) return ParameterName[1];
-            }
-        }
-        
-        if (GetURLParameter("msg")) {
-            document.getElementById("message").innerText = decodeURI(GetURLParameter("msg"));
-            document.getElementById("message").style.display = "block";
-        }
-    </script>
+    </div>
+</body>
+
 </html>
