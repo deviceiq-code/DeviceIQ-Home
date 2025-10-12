@@ -20,6 +20,8 @@ out_dpk  = os.path.join(BUILD_DIR, env.subst(out_name))
 def log(msg): print(f"[mkdevpkg] {msg}")
 
 def try_build_dpk(target=None, source=None, env=None, **kwargs):
+    print(f"")
+    
     if not os.path.exists(fw_bin):
         log(f"Firmware not found: {fw_bin}")
         return
