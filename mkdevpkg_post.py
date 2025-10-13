@@ -31,7 +31,7 @@ def try_build_dpk(target=None, source=None, env=None, **kwargs):
 
     cmd = [tool_exe, fw_bin, fs_bin, out_dpk]
     if overwrite_flag:
-        cmd.append("--rewrite")
+        cmd.append("--overwrite")
 
     log(f"Generating {out_dpk}")
     subprocess.check_call(cmd)

@@ -5,7 +5,7 @@
 #include <DevIQ_MQTT.h>
 #include <DevIQ_DateTime.h>
 #include <DevIQ_Log.h>
-#include <DevIQ_Update.h>
+#include "DevIQ_Update.h"
 
 #include <WiFi.h>
 #include <WiFiClient.h>
@@ -182,15 +182,15 @@ void setup() {
 
                 // WebServer/MQTT
                 if (!interfacesRegistered) {
-                    devWebServer = new AsyncWebServer(Settings.WebHooks.Port());
+                    devWebServer = new AsyncWebServer(Settings.WebServer.Port());
                     
                     devWebServer->onNotFound([](AsyncWebServerRequest *request) { request->send(404); });
                     devWebServer->on("/res/css/styles.css", HTTP_GET, [&](AsyncWebServerRequest *request) { Web_Content("/res/css/styles.css", "text/css", request, false, true); });
                     devWebServer->on("/res/img/logo.png", HTTP_GET, [&](AsyncWebServerRequest *request) { Web_Content("/res/img/logo.png", "image/png", request, false, true); });
                     devWebServer->on("/login.html", HTTP_GET, [&](AsyncWebServerRequest *request) { Web_Content("/login.html", "text/html", request, false); });
 
-                    // Webhooks
-                    if (Settings.WebHooks.Enabled()) {
+                    // WebServer
+                    if (Settings.WebServer.Enabled()) {
                         for (auto m : Settings.Components) {
                             switch (m->Class()) {
 
@@ -199,7 +199,7 @@ void setup() {
                                         JsonDocument reply;
                                         String json;
 
-                                        if (hasValidHeaderToken(request, Settings.WebHooks.Token())) {
+                                        if (hasValidHeaderToken(request, Settings.WebServer.WebHooksToken())) {
                                             bool setnewvalue = false;
                                             String Arg, Val;
 
@@ -245,54 +245,54 @@ void setup() {
                                 case CLASS_PIR : {
                                     registerEndpoint(devWebServer, m, "PIR", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
                                         reply["Motion"] = comp->as<PIR>()->State();
-                                    }, Settings.WebHooks.Token(), devLog);
+                                    }, Settings.WebServer.WebHooksToken(), devLog);
                                 } break;
 
                                 case CLASS_BUTTON: {
                                     registerEndpoint(devWebServer, m, "Button", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
                                         reply["Pressed"] = comp->as<Button>()->IsPressed();
-                                    }, Settings.WebHooks.Token(), devLog);
+                                    }, Settings.WebServer.WebHooksToken(), devLog);
                                 } break;
 
                                 case CLASS_CURRENTMETER: {
                                     registerEndpoint(devWebServer, m, "Currentmeter", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
                                         reply["Current AC"] = comp->as<Currentmeter>()->CurrentAC();
                                         reply["Current DC"] = comp->as<Currentmeter>()->CurrentDC();
-                                    }, Settings.WebHooks.Token(), devLog);
+                                    }, Settings.WebServer.WebHooksToken(), devLog);
                                 } break;
 
                                 case CLASS_THERMOMETER: {
                                     registerEndpoint(devWebServer, m, "Thermometer", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
                                         reply["Humidity"] = comp->as<Thermometer>()->Humidity();
                                         reply["Temperature"] = comp->as<Thermometer>()->Temperature();
-                                    }, Settings.WebHooks.Token(), devLog);
+                                    }, Settings.WebServer.WebHooksToken(), devLog);
                                 } break;
 
                                 case CLASS_BLINDS: {
                                     registerEndpoint(devWebServer, m, "Blinds", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
                                         reply["Position"] = comp->as<Blinds>()->Position();
                                         reply["State"] = comp->as<Blinds>()->State() == BlindsStates::BLINDSSTATE_DECREASING ? "Decreasing" : (comp->as<Blinds>()->State() == BlindsStates::BLINDSSTATE_INCREASING ? "Increasing" : "Stopped");
-                                    }, Settings.WebHooks.Token(), devLog);
+                                    }, Settings.WebServer.WebHooksToken(), devLog);
                                 } break;
 
                                 case CLASS_DOORBELL: {
                                     registerEndpoint(devWebServer, m, "Doorbell", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
                                         reply["State"] = comp->as<Doorbell>()->State();
-                                    }, Settings.WebHooks.Token(), devLog);
+                                    }, Settings.WebServer.WebHooksToken(), devLog);
                                 } break;
 
                                 case CLASS_CONTACTSENSOR: {
                                     registerEndpoint(devWebServer, m, "ContactSensor", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
                                         reply["State"] = comp->as<ContactSensor>()->State();
-                                    }, Settings.WebHooks.Token(), devLog);
+                                    }, Settings.WebServer.WebHooksToken(), devLog);
                                 } break;
                             }
                         }
 
                         devWebServer->begin();
-                        devLog->Write("Webhooks: Enabled on port " + String(Settings.WebHooks.Port()), LOGLEVEL_INFO);
+                        devLog->Write("Web Server: Enabled on port " + String(Settings.WebServer.Port()), LOGLEVEL_INFO);
                     } else {
-                        devLog->Write("Webhooks: Disabled", LOGLEVEL_INFO);
+                        devLog->Write("Web Server: Disabled", LOGLEVEL_INFO);
                     }
 
                     // MQTT

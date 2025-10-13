@@ -30,8 +30,8 @@ struct defaults_t {
         const uint16_t OnlineCheckingTimeout = 10;
     } Network;
     struct update_t {
-        const char* ManifestURL = "https://server.dts-network.com:8081/update.json";
-        const bool AllowInsecure = false;
+        const char* ManifestURL = "https://server.dts-network.com:8081/update-dpk.json";
+        const bool AllowInsecure = true;
         const bool EnableLANOTA = false;
         const char* PasswordLANOTA = "";
         const uint16_t CheckInterval = 3600;
@@ -51,11 +51,11 @@ struct defaults_t {
         const char* IP_Address = "";
         const uint16_t Port = 30030;
     } Orchestrator;
-    struct webhooks_t {
+    struct webserver_t {
         const uint16_t Port = 80;
-        const bool Enabled = false;
-        const char* Token = "";
-    } WebHooks;
+        const bool Enabled = true;
+        const char* WebHooksToken = "default_token";
+    } WebServer;
     struct mqtt_t {
         const bool Enabled = false;
         const char* Broker = "";

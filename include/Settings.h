@@ -167,11 +167,11 @@ class settings_t {
                 [[nodiscard]] uint16_t Port() const noexcept { return pPort; }
                 void Port(uint16_t value) { pPort = (value == 0) ? Defaults.Orchestrator.Port : value; }
         } Orchestrator;
-        class webhooks_t {
+        class webserver_t {
             private:
                 uint16_t pPort{};
                 bool pEnabled{};
-                String pToken;
+                String pWebHooksToken;
             public:
                 [[nodiscard]] uint16_t Port() const noexcept { return pPort; }
                 void Port(uint16_t value) { pPort = (value == 0) ? 80 : value; }
@@ -179,9 +179,9 @@ class settings_t {
                 [[nodiscard]] bool Enabled() const noexcept { return pEnabled; }
                 void Enabled(bool value) noexcept { pEnabled = value; }
 
-                [[nodiscard]] const String& Token() const noexcept { return pToken; }
-                void Token(String value) noexcept;
-        } WebHooks;
+                [[nodiscard]] const String& WebHooksToken() const noexcept { return pWebHooksToken; }
+                void WebHooksToken(String value) noexcept;
+        } WebServer;
         class mqtt_t {
             private:
                 bool pEnabled{};

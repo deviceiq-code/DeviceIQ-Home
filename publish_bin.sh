@@ -4,7 +4,7 @@ set -euo pipefail
 ### ========= CONFIG =========
 PROJECT_NAME="deviceiq-home"                           # prefixo do bin publicado
 VERSION_H="./include/Version.h"                        # caminho para Version.h
-FIRMWARE_SRC="./.pio/build/${PROJECT_NAME}/deviceiq-home.dpk"
+FIRMWARE_SRC="./.pio/build/${PROJECT_NAME}/firmware.bin"
 
 WEB_ROOT="/var/www/html"                               # onde fica o update.json servido (ex.: 8081)
 BIN_DIR="/var/www/html/bin"                            # subpasta onde os .bin serão servidos

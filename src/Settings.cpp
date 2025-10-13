@@ -306,14 +306,14 @@ void settings_t::orchestrator_t::ServerID(String value) noexcept {
     pServerID = std::move(value);
 }
 
-void settings_t::webhooks_t::Token(String value) noexcept {
+void settings_t::webserver_t::WebHooksToken(String value) noexcept {
     value.trim();
 
     constexpr size_t MIN_LEN = 1;
     constexpr size_t MAX_LEN = 64;
 
     if (value.length() < MIN_LEN || value.length() > MAX_LEN) {
-        pToken = String();
+        pWebHooksToken = String();
         return;
     }
 
@@ -321,12 +321,12 @@ void settings_t::webhooks_t::Token(String value) noexcept {
         char c = value.charAt(i);
         bool ok = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || (c == '-') || (c == '_');
         if (!ok) {
-            pToken = String();
+            pWebHooksToken = String();
             return;
         }
     }
 
-    pToken = std::move(value);
+    pWebHooksToken = std::move(value);
 }
 
 void settings_t::mqtt_t::Broker(String value) noexcept {
@@ -450,10 +450,10 @@ void settings_t::LoadDefaults() {
     Orchestrator.IP_Address(Defaults.Orchestrator.IP_Address);
     Orchestrator.Port(Defaults.Orchestrator.Port);
 
-    // WebHooks
-    WebHooks.Port(Defaults.WebHooks.Port);
-    WebHooks.Enabled(Defaults.WebHooks.Enabled);
-    WebHooks.Token(Defaults.WebHooks.Token);
+    // WebServer
+    WebServer.Port(Defaults.WebServer.Port);
+    WebServer.Enabled(Defaults.WebServer.Enabled);
+    WebServer.WebHooksToken(Defaults.WebServer.WebHooksToken);
 
     // MQTT
     MQTT.Enabled(Defaults.MQTT.Enabled);
@@ -550,11 +550,11 @@ bool settings_t::Load(const String& configfilename) noexcept {
     // WebHooks
     if (root["WebHooks"].is<JsonObjectConst>()) {
         JsonObjectConst wh = root["WebHooks"].as<JsonObjectConst>();
-        WebHooks.Port((uint16_t)(wh["Port"] | Defaults.WebHooks.Port));
-        WebHooks.Enabled((bool)(wh["Enabled"] | Defaults.WebHooks.Enabled));
-        WebHooks.Token(String(wh["Token"] | Defaults.WebHooks.Token));
+        WebServer.Port((uint16_t)(wh["Port"] | Defaults.WebServer.Port));
+        WebServer.Enabled((bool)(wh["Enabled"] | Defaults.WebServer.Enabled));
+        WebServer.WebHooksToken(String(wh["Token"] | Defaults.WebServer.WebHooksToken));
 
-        if (WebHooks.Token().isEmpty()) WebHooks.Enabled(false); // Token must be >= 1 char
+        if (WebServer.WebHooksToken().isEmpty()) WebServer.Enabled(false); // Token must be >= 1 char
     }
 
     // MQTT
@@ -1002,10 +1002,10 @@ bool settings_t::Save(const String& configfilename) const noexcept {
 
     // WebHooks
     {
-        JsonObject wh = doc["WebHooks"].to<JsonObject>();
-        wh["Port"] = WebHooks.Port();
-        wh["Enabled"] = WebHooks.Enabled();
-        wh["Token"] = WebHooks.Token();
+        JsonObject wh = doc["Web Server"].to<JsonObject>();
+        wh["Port"] = WebServer.Port();
+        wh["Enabled"] = WebServer.Enabled();
+        wh["WebHooks Token"] = WebServer.WebHooksToken();
     }
 
     // MQTT
