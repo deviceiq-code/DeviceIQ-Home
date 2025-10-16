@@ -1,0 +1,113 @@
+#ifndef DevIQ_FileSystem_h
+#define DevIQ_FileSystem_h
+
+#pragma once
+
+#include <Arduino.h>
+#include <LittleFS.h>
+
+namespace DeviceIQ_FileSystem {
+
+    // Volume selector for dual LittleFS partitions
+    enum class Volume : uint8_t { System = 0, Config = 1 };
+
+    class FileSystem {
+        private:
+            // Separate FS instances bound to different partitions
+            fs::LittleFSFS mSysFS;
+            fs::LittleFSFS mCfgFS;
+
+            bool mInitialized = false;
+            bool mSysOK = false;
+            bool mCfgOK = false;
+
+            // Internal helpers to route operations
+            inline fs::FS& _fs(Volume v)             { return (v == Volume::Config) ? static_cast<fs::FS&>(mCfgFS) : static_cast<fs::FS&>(mSysFS); }
+            inline const fs::FS& _fs(Volume v) const { return (v == Volume::Config) ? static_cast<const fs::FS&>(mCfgFS) : static_cast<const fs::FS&>(mSysFS); }
+
+        public:
+            // Do not auto-begin; caller invokes Begin(...) explicitly
+            inline FileSystem() = default;
+            virtual ~FileSystem() {}
+
+            fs::LittleFSFS& SystemFS()  { return mSysFS; }   // NOTE: expose raw FS handle
+            fs::LittleFSFS& ConfigFS()  { return mCfgFS; }
+
+            // Overall flags
+            inline bool Initialized() const { return mInitialized; }
+            inline bool SystemReady() const { return mSysOK; }
+            inline bool ConfigReady() const { return mCfgOK; }
+
+            // Legacy API (system volume by default) ---------------------------------
+            inline size_t TotalSpace() { return (mSysOK ? mSysFS.totalBytes() : 0); }
+            inline size_t UsedSpace() { return (mSysOK ? mSysFS.usedBytes()  : 0); }
+            inline size_t FreeSpace() { return (mSysOK ? TotalSpace() - UsedSpace() : 0); }
+            inline float  PercentUsed() { return (mSysOK && TotalSpace() ? (float)UsedSpace() * 100.0f / (float)TotalSpace() : 0.0f); }
+            inline float  PercentFree() { return 100.0f - PercentUsed(); }
+
+            inline fs::File OpenFile(const String& path, const char* mode)                     { if (!mSysOK) return fs::File(); return mSysFS.open(path, mode); }
+            inline bool     DeleteFile(const String& path)                                     { return (mSysOK ? mSysFS.remove(path) : false); }
+            inline bool     RemoveFile(const String& path)                                     { return DeleteFile(path); }
+            inline bool     RenameFile(const String& from, const String& to)                   { return (mSysOK ? mSysFS.rename(from, to) : false); }
+            inline bool     Exists(const String& path)                                         { return (mSysOK ? mSysFS.exists(path) : false); }
+
+            // New API with volume selector -----------------------------------------
+            inline fs::File OpenFile(const String& path, const char* mode, Volume v)           { if (!mInitialized) return fs::File(); return _fs(v).open(path, mode); }
+            inline bool     DeleteFile(const String& path, Volume v)                           { return (mInitialized ? _fs(v).remove(path) : false); }
+            inline bool     RenameFile(const String& from, const String& to, Volume v)         { return (mInitialized ? _fs(v).rename(from, to) : false); }
+            inline bool     Exists(const String& path, Volume v)                               { return (mInitialized ? _fs(v).exists(path) : false); }
+            inline size_t TotalSpace(Volume v) { if (!mInitialized) return 0; return (v == Volume::Config) ? mCfgFS.totalBytes() : mSysFS.totalBytes(); }
+            inline size_t UsedSpace(Volume v) { if (!mInitialized) return 0; return (v == Volume::Config) ? mCfgFS.usedBytes() : mSysFS.usedBytes(); }
+
+            // Convenience aliases for config volume --------------------------------
+            inline fs::File OpenFileConfig(const String& path, const char* mode)               { return OpenFile(path, mode, Volume::Config); }
+            inline bool     DeleteFileConfig(const String& path)                               { return DeleteFile(path, Volume::Config); }
+            inline bool     RenameFileConfig(const String& from, const String& to)             { return RenameFile(from, to, Volume::Config); }
+            inline bool     ExistsConfig(const String& path)                                   { return Exists(path, Volume::Config); }
+            inline size_t   ConfigTotalSpace() { return TotalSpace(Volume::Config); }
+            inline size_t   ConfigUsedSpace() { return UsedSpace(Volume::Config); }
+
+            // Lifecycle -------------------------------------------------------------
+            bool Begin(bool autoFormat = false);    // mounts both: system(default label) and config(label "config")
+            void End();                              // unmount both
+            bool Format();                           // format system volume
+            bool FormatConfig();                     // format config volume
+
+            // High-level ops (default: system) -------------------------------------
+            bool ReadFile(const String& path, String& out);
+            bool WriteFile(const String& path, const String& data, bool append = false);
+            inline bool AppendFile(const String& path, const String& data) { return WriteFile(path, data, true); }
+
+            bool ReadBinary(const String& path, uint8_t* buf, size_t len, size_t& outRead);
+            bool WriteBinary(const String& path, const uint8_t* buf, size_t len, bool append = false);
+
+            size_t FileSize(const String& path);
+            bool IsDirectory(const String& path);
+
+            bool Mkdir(const String& path);
+            bool Rmdir(const String& path);
+            void ListDir(const String& path, Print& out);
+            void ListDirRecursive(const String& path, Print& out, uint8_t levels = 5);
+
+            bool SafeSave(const String& path, const uint8_t* data, size_t len);
+            bool MoveFile(const String& from, const String& to);
+            bool Touch(const String& path);
+            bool Truncate(const String& path, size_t newSize);
+            String TempName(const String& prefix = "/tmp_");
+
+            // Config-volume variants for common ops --------------------------------
+            bool ReadFileConfig(const String& path, String& out);
+            bool WriteFileConfig(const String& path, const String& data, bool append = false);
+            inline bool AppendFileConfig(const String& path, const String& data) { return WriteFileConfig(path, data, true); }
+            size_t FileSizeConfig(const String& path);
+            bool MkdirConfig(const String& path);
+            bool RmdirConfig(const String& path);
+            void ListDirConfig(const String& path, Print& out);
+            void ListDirRecursiveConfig(const String& path, Print& out, uint8_t levels = 5);
+
+            // Bulk copy (same-volume by default; cross-volume supported via explicit opens)
+            bool CopyFile(const String& origin, const String& destination);
+        };
+}
+
+#endif

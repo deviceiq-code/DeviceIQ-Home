@@ -491,7 +491,7 @@ bool orchestrator::Remove(const JsonVariantConst& cmd) {
 }
 
 bool orchestrator::Restart(const JsonVariantConst& cmd) {
-    if (!isManaged(cmd)) return false;
+    // if (!isManaged(cmd)) return false;
 
     if (connectAndExchangeJson(Settings.Orchestrator.IP_Address(), Settings.Orchestrator.Port(), [&](WiFiClient& client) {
         JsonDocument reply;

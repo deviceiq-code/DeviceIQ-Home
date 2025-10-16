@@ -920,7 +920,7 @@ bool settings_t::InstallComponents(const String& configfilename) noexcept {
 }
 
 void settings_t::RestoreToFactoryDefaults() {
-    devFileSystem->Format();
+    devFileSystem->DeleteFile(Defaults.ConfigFileName);
     
     esp_sleep_enable_timer_wakeup(200 * 1000);
     esp_deep_sleep_start();

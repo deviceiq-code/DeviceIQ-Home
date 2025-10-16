@@ -5,6 +5,9 @@
 
 extern settings_t Settings;
 
+extern FileSystem* devFileSystem;
+extern Network* devNetwork;
+
 String CharArrayPointerToString(char* Text, uint32_t length) {
     String tmpRet;
     for (uint32_t i = 0; i < length; i++) tmpRet += (char)Text[i];
@@ -198,6 +201,8 @@ void Web_Content(String content, String mimetype, AsyncWebServerRequest *request
         request->send(LittleFS, content, mimetype, false);
     } else {
         request->send(LittleFS, content, mimetype, false, [&](const String &var) {
+            String tmp;
+
             if (var.equalsIgnoreCase("VERSION")) {
                 return Version.Software.Info();
             }
@@ -208,9 +213,17 @@ void Web_Content(String content, String mimetype, AsyncWebServerRequest *request
                 return Version.ProductName;
             }
             if (var.equalsIgnoreCase("HOSTNAME")) {
-                return Settings.Network.Hostname();
-            }
+                tmp = Settings.Network.Hostname();
+                tmp.toUpperCase();
 
+                return tmp;
+            }
+            if (var.equalsIgnoreCase("MACADDRESS")) {
+                tmp = devNetwork->MAC_Address();
+                tmp.toUpperCase();
+
+                return tmp;
+            }
             return String();
         });
     }

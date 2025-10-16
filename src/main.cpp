@@ -52,6 +52,8 @@ void setup() {
 
     // FileSystem
     devFileSystem = new FileSystem();
+    devFileSystem->Begin();
+
     if (devFileSystem->Exists(String(Defaults.ConfigFileName) + ".tmp")) {
         devFileSystem->DeleteFile(String(Defaults.ConfigFileName) + ".tmp"); // Delete any old temporary config file
     }
@@ -137,6 +139,7 @@ void setup() {
                 if (Settings.Update.Debug()) devLog->Write("Update Client: Applying update", LOGLEVEL_INFO);
             } break;
             case Event::Rebooting: {
+                Settings.Save();
                 if (Settings.Update.Debug()) devLog->Write("Update Client: Rebooting to apply update", LOGLEVEL_WARNING);
             } break;
             default: break;
@@ -187,6 +190,7 @@ void setup() {
                     devWebServer->onNotFound([](AsyncWebServerRequest *request) { request->send(404); });
                     devWebServer->on("/res/css/styles.css", HTTP_GET, [&](AsyncWebServerRequest *request) { Web_Content("/res/css/styles.css", "text/css", request, false, true); });
                     devWebServer->on("/res/img/logo.png", HTTP_GET, [&](AsyncWebServerRequest *request) { Web_Content("/res/img/logo.png", "image/png", request, false, true); });
+                    devWebServer->on("/res/img/logo-min.png", HTTP_GET, [&](AsyncWebServerRequest *request) { Web_Content("/res/img/logo-min.png", "image/png", request, false, true); });
                     devWebServer->on("/login.html", HTTP_GET, [&](AsyncWebServerRequest *request) { Web_Content("/login.html", "text/html", request, false); });
 
                     // WebServer

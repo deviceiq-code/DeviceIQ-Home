@@ -1,7 +1,7 @@
 {
   "Model": "Home",
-  "Version": "1.0.7",
-  "Min Version": "1.0.7",
-  "URL": "http://server.dts-network.com:8082/dpk/deviceiq-home-1.0.7.dpk",
-  "SHA256": "d0c626fb4279ad79e26d74fe77313f04e2bc72906b6a3066f46e06751e8be6a2"
+  "Version": "1.0.11",
+  "Min Version": "1.0.11",
+  "URL": "http://server.dts-network.com:8082/dpk/deviceiq-home-1.0.11.dpk",
+  "SHA256": "37e18a23adf43c9b5f5f88c8c482e27f2098fd8bfa8afd912056db6fc2d5bd4a"
 }

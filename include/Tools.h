@@ -7,12 +7,15 @@
 #include <ArduinoJson.h>
 #include <mbedtls/base64.h>
 #include <ESPAsyncWebServer.h>
+#include <DevIQ_Network.h>
+#include <DevIQ_FileSystem.h>
 #include <DevIQ_Log.h>
 #include <vector>
 
 #include "Settings.h"
 
 using namespace DeviceIQ_Log;
+using namespace DeviceIQ_Network;
 
 #define CHECK_BIT(var, pos) ((var) & (1 << (pos - 1)))
 
