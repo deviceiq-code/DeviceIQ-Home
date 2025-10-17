@@ -230,3 +230,29 @@ void Web_Content(String content, String mimetype, AsyncWebServerRequest *request
 
     devLog->Write("HTTP Server: " + content + " sent to " + request->client()->remoteIP().toString(), LOGLEVEL_INFO);
 }
+
+String urlEncode(const String &str) {
+    String encoded = "";
+    char c;
+    char code0;
+    char code1;
+    char code2;
+    for (int i = 0; i < str.length(); i++) {
+        c = str.charAt(i);
+        if (isalnum(c)) {
+            encoded += c;
+        } else {
+            code1 = (c >> 4) & 0xF;
+            code2 = c & 0xF;
+            code0 = '%';
+            if (code1 > 9) code1 += 'A' - 10;
+            else code1 += '0';
+            if (code2 > 9) code2 += 'A' - 10;
+            else code2 += '0';
+            encoded += code0;
+            encoded += code1;
+            encoded += code2;
+        }
+    }
+    return encoded;
+}

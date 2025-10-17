@@ -9,6 +9,12 @@
 #include <DevIQ_Log.h>
 #include <DevIQ_MQTT.h>
 #include <DevIQ_Components.h>
+#include <base64.h>
+#include <mbedtls/sha256.h>
+#include <mbedtls/pkcs5.h>
+#include <mbedtls/md.h>
+#include <mbedtls/entropy.h>
+#include <mbedtls/ctr_drbg.h>
 
 using namespace DeviceIQ_FileSystem;
 using namespace DeviceIQ_Log;
@@ -20,6 +26,46 @@ extern Log *devLog;
 extern MQTT *devMQTT;
 
 #include "Defaults.h"
+
+#define PASS_PBKDF2_ITERATIONS  10000
+#define PASS_SALTLEN            16    // 128-bit salt
+#define PASS_HASHLEN            32    // SHA-256 size
+#define MAX_USERS               3
+
+enum class UserError : uint8_t { OK = 0, UserExists, UserNotFound, MaxUsersReached, NoAdminRemaining, PasswordError, InvalidCredentials };
+
+class user_t {
+    private:
+        String pUsername;
+        bool pAdmin;
+    public:
+        uint8_t Salt[PASS_SALTLEN] = {0};
+        uint8_t Hash[PASS_HASHLEN] = {0};
+
+        void Username(const String& username) { pUsername = username; pUsername.toLowerCase(); }
+        const String& Username() const noexcept { return pUsername; }
+        bool Admin() const noexcept { return pAdmin; }
+        void Admin(bool value) noexcept { pAdmin = value; }
+        
+        bool SetPassword(const String& password);
+        bool Authenticate(const String& password) const;
+};
+
+class users_t {
+    private:
+        user_t pUsers[MAX_USERS];
+        size_t userCount = 0;
+        bool hasAdmin() const { for (size_t i = 0; i < userCount; ++i) if (pUsers[i].Admin()) return true; return false; }
+    public:
+        users_t() = default;
+        
+        inline size_t Count() const noexcept { return userCount; }
+        inline size_t CountAdmins() const noexcept { size_t count = 0; for (size_t i = 0; i < userCount; ++i) if (pUsers[i].Admin()) count++; return count; }
+        UserError Add(const String& username, const String& password, bool admin = false);
+        UserError Remove(const String& username);
+        UserError Authenticate(const String& username, const String& password, user_t** outUser = nullptr);
+        UserError Find(const String& username, user_t** outUser = nullptr);
+};
 
 class settings_t {
     private:
@@ -211,6 +257,7 @@ class settings_t {
         void SetSaveComponentsState() noexcept { pSaveComponentsStateFlag = true; }
 
         Collection Components;
+        users_t Users;
 
         void LoadDefaults();
         void RestoreToFactoryDefaults();

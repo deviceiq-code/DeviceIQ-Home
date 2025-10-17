@@ -13,20 +13,24 @@
         <div class="login left">
             <div class="login left top">
                 <h2>%PRODUCTFAMILY% %PRODUCTNAME%</h2>
-                <form>
+                <form action="/login.cgi" method="post">
                     <div class="style-1">
                         <label for="username">Email or Username</label>
-                        <input type="text" id="username" placeholder="" required>
+                        <input type="text" name="username" placeholder="" required>
                     </div>
                     <div class="style-1">
                         <label for="password">Password</label>
-                        <input type="password" id="password" placeholder="" required>
+                        <input type="password" name="password" placeholder="" required>
                     </div>
                     <div class="checkbox-style-1">
                         <input type="checkbox" id="remember">
                         <label for="remember">Remember my credentials</label>
                     </div>
-                    <button type="submit" class="button-style-1">Sign In</button>
+                    <button type="submit" name="loginBtn" class="button-style-1" disabled>Sign In</button>
+                    <div id="messagebox" class="messagebox error" style="display:none;">
+                        <h2 id="title"></h2>
+                        <p id="message"></p>
+                    </div>
                 </form>
             </div>
             <div class="login left bottom">
@@ -44,5 +48,34 @@
         </div>
     </div>
 </body>
+<script>
+    window.addEventListener('load', () => {
+        const cookies = document.cookie.split(';');
+        const msgCookie = cookies.find(c => c.trim().startsWith('LOGIN_MSG='));
+        if (msgCookie) {
+            const raw = decodeURIComponent(msgCookie.split('=')[1]);
+            try {
+                const data = JSON.parse(raw);
+                document.getElementById("title").innerText = data.title;
+                document.getElementById("message").innerText = data.message;
+                document.getElementById("messagebox").style.display = "block";
+            } catch (e) {
+                console.error("Invalid LOGIN_MSG cookie:", e);
+            }
+            document.cookie = "LOGIN_MSG=; Max-Age=0";
+        }
+        
+        const username = document.getElementsByName('username')[0];
+        const password = document.getElementsByName('password')[0];
+        const loginBtn = document.getElementsByName('loginBtn')[0];
+
+        function toggleButton() {
+            loginBtn.disabled = !(username.value.trim() && password.value.trim());
+        }
+
+        username.addEventListener('input', toggleButton);
+        password.addEventListener('input', toggleButton);
+    });
+</script>
 
 </html>

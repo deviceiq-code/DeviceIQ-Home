@@ -70,5 +70,6 @@ uint32_t CRC32_Update(uint32_t crc, const uint8_t* data, size_t len);
 uint32_t CRC32_File(File& f);
 
 void Web_Content(String content, String mimetype, AsyncWebServerRequest *request, bool requires_authentication, bool static_content = false);
+String urlEncode(const String &str);
 
 #endif

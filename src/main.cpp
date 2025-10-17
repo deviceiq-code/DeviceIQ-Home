@@ -60,6 +60,7 @@ void setup() {
 
     // Settings
     Settings.Load();
+    Settings.Users.Add("admin", "abc123", true);
 
     // Clock
     devClock = new Clock();
@@ -96,24 +97,22 @@ void setup() {
     devNetwork->OnlineCheckingTimeout(Settings.Network.OnlineCheckingTimeout());
 
     // Update
-    devUpdateClient = new UpdateClient([&]{
-        DeviceIQ_Update::UpdateConfig c;
-        c.model = Version.ProductName;
-        c.currentVersion = Version.Software.Info();
-        c.manifestUrl = Settings.Update.ManifestURL();
-        c.rootCA_PEM = nullptr;
-        c.allowInsecure = Settings.Update.AllowInsecure();
-        c.enableLanOta = Settings.Update.EnableLANOTA();
+    DeviceIQ_Update::UpdateConfig config;
+    config.model = Version.ProductName;
+    config.currentVersion = Version.Software.Info();
+    config.manifestUrl = Settings.Update.ManifestURL();
+    config.rootCA_PEM = nullptr;
+    config.allowInsecure = Settings.Update.AllowInsecure();
+    config.enableLanOta = Settings.Update.EnableLANOTA();
 
-        c.lanHostname = Settings.Network.Hostname();
-        c.lanPassword = Settings.Update.PasswordLANOTA();
-        c.checkInterval = Settings.Update.CheckInterval();
-        c.httpTimeout = 15;
-        c.streamBufSize = size_t(4096);
-        c.autoReboot = Settings.Update.AutoReboot();
+    config.lanHostname = Settings.Network.Hostname();
+    config.lanPassword = Settings.Update.PasswordLANOTA();
+    config.checkInterval = Settings.Update.CheckInterval();
+    config.httpTimeout = 15;
+    config.streamBufSize = size_t(4096);
+    config.autoReboot = Settings.Update.AutoReboot();
 
-        return c;
-    }());
+    devUpdateClient = new UpdateClient(config);
 
     devUpdateClient->OnError([&](DeviceIQ_Update::Error e, const String& d) {
         if (Settings.Update.Debug()) devLog->Write("Update Client: Error [" + String((int)e) + "] Detail [" + d + "]", LOGLEVEL_INFO);
@@ -127,20 +126,23 @@ void setup() {
 
         switch (e) {
             case Event::NewVersion: {
-                devLog->Write("Update Client: New version " + v + " available (MIN " + min + ", FORCED " + (forced ? "Yes" : "No") + ")", forced ? LOGLEVEL_WARNING : LOGLEVEL_INFO);
+                devLog->Write("New firmware version " + v + " available (MIN " + min + ", FORCED " + (forced ? "Yes" : "No") + ")", forced ? LOGLEVEL_WARNING : LOGLEVEL_INFO);
             } break;
             case Event::Downloading: {
-                if (Settings.Update.Debug()) devLog->Write("Update Client: Downloading " + url, LOGLEVEL_INFO);
+                // if (Settings.Update.Debug()) devLog->Write("Update Client: Downloading " + url, LOGLEVEL_INFO);
             } break;
             case Event::Verifying: {
-                if (Settings.Update.Debug()) devLog->Write("Update Client: Verifying new firmware integrity", LOGLEVEL_INFO);
+                // if (Settings.Update.Debug()) devLog->Write("Update Client: Verifying new firmware integrity", LOGLEVEL_INFO);
             } break;
             case Event::Applying: {
-                if (Settings.Update.Debug()) devLog->Write("Update Client: Applying update", LOGLEVEL_INFO);
+                // if (Settings.Update.Debug()) devLog->Write("Update Client: Applying update", LOGLEVEL_INFO);
             } break;
             case Event::Rebooting: {
-                Settings.Save();
-                if (Settings.Update.Debug()) devLog->Write("Update Client: Rebooting to apply update", LOGLEVEL_WARNING);
+                if (Settings.Save()) {
+                    if (devFileSystem->Exists(Defaults.ConfigFileName)) {
+                        devLog->Write(Version.ProductFamily + " updated - Restarting", LOGLEVEL_WARNING);
+                    }
+                }
             } break;
             default: break;
         }
@@ -192,6 +194,36 @@ void setup() {
                     devWebServer->on("/res/img/logo.png", HTTP_GET, [&](AsyncWebServerRequest *request) { Web_Content("/res/img/logo.png", "image/png", request, false, true); });
                     devWebServer->on("/res/img/logo-min.png", HTTP_GET, [&](AsyncWebServerRequest *request) { Web_Content("/res/img/logo-min.png", "image/png", request, false, true); });
                     devWebServer->on("/login.html", HTTP_GET, [&](AsyncWebServerRequest *request) { Web_Content("/login.html", "text/html", request, false); });
+
+                    devWebServer->on("/login.cgi", HTTP_POST, [&](AsyncWebServerRequest *request) {
+                        if (request->hasArg("username") && request->hasArg("password")) {
+                            if (Settings.Users.Authenticate(request->arg("username"), request->arg("password")) == UserError::OK) {
+                                AsyncWebServerResponse *response = request->beginResponse(301);  // Sends 301 redirect
+
+                                response->addHeader("Location", "/");
+                                response->addHeader("Cache-Control", "no-cache");
+
+                                String token = String(request->arg("username") + ":" + request->arg("password") + ":" + request->client()->remoteIP().toString());
+                                response->addHeader("Set-Cookie", "ESPSESSIONID=" + token);
+
+                                request->send(response);
+
+                                devLog->Write("HTTP logon successful for '" + request->arg("username") + "@" + request->client()->remoteIP().toString() + "'", LOGLEVEL_INFO);
+                                return;
+                            } else {
+                                devLog->Write("HTTP login failed for '" + request->arg("username") + "@" + request->client()->remoteIP().toString() + "'", LOGLEVEL_ERROR);
+                                String msg = "{\"title\":\"Error\",\"message\":\"You do not have permissions to access this device\"}";
+                                String encodedMsg = urlEncode(msg);
+
+                                AsyncWebServerResponse *response = request->beginResponse(301);
+                                response->addHeader("Location", "/login.html");
+                                response->addHeader("Cache-Control", "no-cache");
+                                response->addHeader("Set-Cookie", "LOGIN_MSG=" + encodedMsg + "; Max-Age=5; Path=/");
+                                request->send(response);
+                                return;
+                            }
+                        }
+                    });
 
                     // WebServer
                     if (Settings.WebServer.Enabled()) {

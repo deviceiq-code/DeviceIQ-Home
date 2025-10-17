@@ -1,5 +1,117 @@
 #include "Settings.h"
 
+bool user_t::SetPassword(const String& password) {
+    mbedtls_entropy_context entropy;
+    mbedtls_ctr_drbg_context ctr_drbg;
+    const char* pers = "user_salt_gen";
+
+    mbedtls_entropy_init(&entropy);
+    mbedtls_ctr_drbg_init(&ctr_drbg);
+
+    if (mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy, (const unsigned char*)pers, strlen(pers)) != 0) {
+        mbedtls_ctr_drbg_free(&ctr_drbg);
+        mbedtls_entropy_free(&entropy);
+        return false;
+    }
+
+    if (mbedtls_ctr_drbg_random(&ctr_drbg, Salt, PASS_SALTLEN) != 0) {
+        mbedtls_ctr_drbg_free(&ctr_drbg);
+        mbedtls_entropy_free(&entropy);
+        return false;
+    }
+
+    mbedtls_md_context_t ctx;
+    const mbedtls_md_info_t* info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
+    mbedtls_md_init(&ctx);
+
+    if (mbedtls_md_setup(&ctx, info, 1) != 0) {
+        mbedtls_md_free(&ctx);
+        mbedtls_ctr_drbg_free(&ctr_drbg);
+        mbedtls_entropy_free(&entropy);
+        return false;
+    }
+
+    int ret = mbedtls_pkcs5_pbkdf2_hmac(&ctx, (const unsigned char*)password.c_str(), password.length(), Salt, PASS_SALTLEN, PASS_PBKDF2_ITERATIONS, PASS_HASHLEN, Hash);
+
+    mbedtls_md_free(&ctx);
+    mbedtls_ctr_drbg_free(&ctr_drbg);
+    mbedtls_entropy_free(&entropy);
+
+    return (ret == 0);
+}
+
+bool user_t::Authenticate(const String& password) const {
+    uint8_t computed[PASS_HASHLEN];
+
+    mbedtls_md_context_t ctx;
+    const mbedtls_md_info_t* info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
+    mbedtls_md_init(&ctx);
+
+    if (mbedtls_md_setup(&ctx, info, 1) != 0) {
+        mbedtls_md_free(&ctx);
+        return false;
+    }
+
+    int ret = mbedtls_pkcs5_pbkdf2_hmac(&ctx, (const unsigned char*)password.c_str(), password.length(), Salt, PASS_SALTLEN, PASS_PBKDF2_ITERATIONS, PASS_HASHLEN, computed);
+
+    mbedtls_md_free(&ctx);
+
+    if (ret != 0) return false;
+
+    return memcmp(Hash, computed, PASS_HASHLEN) == 0;
+}
+
+UserError users_t::Add(const String& username, const String& password, bool admin) {
+    if (userCount >= MAX_USERS) return UserError::MaxUsersReached;
+
+    for (size_t i = 0; i < userCount; ++i) if (pUsers[i].Username() == username) return UserError::UserExists;
+
+    user_t& u = pUsers[userCount];
+    u.Username(username);
+    u.Admin(admin);
+    
+    if (!u.SetPassword(password)) return UserError::PasswordError;
+    
+    userCount++;
+    return UserError::OK;
+}
+
+UserError users_t::Remove(const String& username) {
+    for (size_t i = 0; i < userCount; ++i) {
+        if (pUsers[i].Username() == username) {
+            if (pUsers[i].Admin() && CountAdmins() == 1) return UserError::NoAdminRemaining;
+
+            pUsers[i] = pUsers[userCount - 1];
+            userCount--;
+            return UserError::OK;
+        }
+    }
+    return UserError::UserNotFound;
+}
+
+UserError users_t::Authenticate(const String& username, const String& password, user_t** outUser) {
+    for (size_t i = 0; i < userCount; ++i) {
+        if (pUsers[i].Username() == username) {
+            if (pUsers[i].Authenticate(password)) {
+                if (outUser) *outUser = &pUsers[i];
+                return UserError::OK;
+            }
+            return UserError::InvalidCredentials;
+        }
+    }
+    return UserError::UserNotFound;
+}
+
+UserError users_t::Find(const String& username, user_t** outUser) {
+    for (size_t i = 0; i < userCount; ++i) {
+        if (pUsers[i].Username() == username) {
+            if (outUser) *outUser = &pUsers[i];
+            return UserError::OK;
+        }
+    }
+    return UserError::UserNotFound;
+}
+
 void settings_t::network_t::Hostname(String value) noexcept {
     value.trim();
     value.toLowerCase();
