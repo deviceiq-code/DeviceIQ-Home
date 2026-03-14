@@ -69,6 +69,7 @@ class AsyncTelnetSession {
         String User;
         String InputBuffer;
         String LastInput;
+        bool IsAdmin;
 };
 
 class AsyncTelnetServer {
@@ -89,8 +90,7 @@ class AsyncTelnetServer {
     public:
         AsyncTelnetServer(uint16_t port);
         ~AsyncTelnetServer();
-
-        String Prompt = ASYNCTELNETSERVER_DEFAULTPROMPT;
+        
         String WelcomeMessage = ASYNCTELNETSERVER_DEFAULTWELCOMEMESSAGE;
 
         telnet_session_callback_t onSessionBegin = nullptr;

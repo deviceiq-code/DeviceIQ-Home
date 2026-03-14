@@ -32,7 +32,7 @@ extern MQTT *devMQTT;
 #define PASS_HASHLEN            32    // SHA-256 size
 #define MAX_USERS               3
 
-enum class UserError : uint8_t { OK = 0, UserExists, UserNotFound, MaxUsersReached, NoAdminRemaining, PasswordError, InvalidCredentials };
+enum class UserReturn : uint8_t { OK = 0, UserExists, UserNotFound, MaxUsersReached, NoAdminRemaining, PasswordError, InvalidCredentials, Authenticated };
 
 class user_t {
     private:
@@ -61,10 +61,10 @@ class users_t {
         
         inline size_t Count() const noexcept { return userCount; }
         inline size_t CountAdmins() const noexcept { size_t count = 0; for (size_t i = 0; i < userCount; ++i) if (pUsers[i].Admin()) count++; return count; }
-        UserError Add(const String& username, const String& password, bool admin = false);
-        UserError Remove(const String& username);
-        UserError Authenticate(const String& username, const String& password, user_t** outUser = nullptr);
-        UserError Find(const String& username, user_t** outUser = nullptr);
+        UserReturn Add(const String& username, const String& password, bool admin = false);
+        UserReturn Remove(const String& username);
+        UserReturn Authenticate(const String& username, const String& password, user_t** outUser = nullptr);
+        UserReturn Find(const String& username, user_t** outUser = nullptr);
 };
 
 class settings_t {

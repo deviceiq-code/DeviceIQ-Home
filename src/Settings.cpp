@@ -61,55 +61,55 @@ bool user_t::Authenticate(const String& password) const {
     return memcmp(Hash, computed, PASS_HASHLEN) == 0;
 }
 
-UserError users_t::Add(const String& username, const String& password, bool admin) {
-    if (userCount >= MAX_USERS) return UserError::MaxUsersReached;
+UserReturn users_t::Add(const String& username, const String& password, bool admin) {
+    if (userCount >= MAX_USERS) return UserReturn::MaxUsersReached;
 
-    for (size_t i = 0; i < userCount; ++i) if (pUsers[i].Username() == username) return UserError::UserExists;
+    for (size_t i = 0; i < userCount; ++i) if (pUsers[i].Username() == username) return UserReturn::UserExists;
 
     user_t& u = pUsers[userCount];
     u.Username(username);
     u.Admin(admin);
     
-    if (!u.SetPassword(password)) return UserError::PasswordError;
+    if (!u.SetPassword(password)) return UserReturn::PasswordError;
     
     userCount++;
-    return UserError::OK;
+    return UserReturn::OK;
 }
 
-UserError users_t::Remove(const String& username) {
+UserReturn users_t::Remove(const String& username) {
     for (size_t i = 0; i < userCount; ++i) {
         if (pUsers[i].Username() == username) {
-            if (pUsers[i].Admin() && CountAdmins() == 1) return UserError::NoAdminRemaining;
+            if (pUsers[i].Admin() && CountAdmins() == 1) return UserReturn::NoAdminRemaining;
 
             pUsers[i] = pUsers[userCount - 1];
             userCount--;
-            return UserError::OK;
+            return UserReturn::OK;
         }
     }
-    return UserError::UserNotFound;
+    return UserReturn::UserNotFound;
 }
 
-UserError users_t::Authenticate(const String& username, const String& password, user_t** outUser) {
+UserReturn users_t::Authenticate(const String& username, const String& password, user_t** outUser) {
     for (size_t i = 0; i < userCount; ++i) {
         if (pUsers[i].Username() == username) {
             if (pUsers[i].Authenticate(password)) {
                 if (outUser) *outUser = &pUsers[i];
-                return UserError::OK;
+                return UserReturn::Authenticated;
             }
-            return UserError::InvalidCredentials;
+            return UserReturn::InvalidCredentials;
         }
     }
-    return UserError::UserNotFound;
+    return UserReturn::UserNotFound;
 }
 
-UserError users_t::Find(const String& username, user_t** outUser) {
+UserReturn users_t::Find(const String& username, user_t** outUser) {
     for (size_t i = 0; i < userCount; ++i) {
         if (pUsers[i].Username() == username) {
             if (outUser) *outUser = &pUsers[i];
-            return UserError::OK;
+            return UserReturn::OK;
         }
     }
-    return UserError::UserNotFound;
+    return UserReturn::UserNotFound;
 }
 
 void settings_t::network_t::Hostname(String value) noexcept {

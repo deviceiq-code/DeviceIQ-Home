@@ -96,7 +96,7 @@ AsyncTelnetServer::AsyncTelnetServer(uint16_t port) : mPort(port) {
             onSessionBegin(client, session);
         }
 
-        client->write(String("\r\n" + WelcomeMessage + "\r\n\r\n" + Prompt).c_str());
+        client->write(String("\r\n" + WelcomeMessage + "\r\n\r\n" + ASYNCTELNETSERVER_GUESTUSER + String(" ") + ASYNCTELNETSERVER_DEFAULTPROMPT).c_str());
 
         client->onData([&](void* arg, AsyncClient* client, void* data, size_t len) {
             AsyncTelnetSession* session = FindSession(client);
@@ -127,7 +127,7 @@ AsyncTelnetServer::AsyncTelnetServer(uint16_t port) : mPort(port) {
                         ProcessLine(client, line);
                     } else {
                         client->write("\r\n");
-                        client->write(Prompt.c_str());
+                        client->write(String(session->User + String(" ") + ASYNCTELNETSERVER_DEFAULTPROMPT).c_str());
                     }
 
                     if (b == '\r' && (i + 1 < len) && bytes[i + 1] == '\n') {
@@ -273,7 +273,7 @@ void AsyncTelnetServer::ProcessLine(AsyncClient* client, const String& line) {
     }
 
     if (incomeData.isEmpty()) {
-        client->write(Prompt.c_str());
+        client->write(String(session->User + String(" ") + ASYNCTELNETSERVER_DEFAULTPROMPT).c_str());
         return;
     }
 
@@ -330,7 +330,7 @@ void AsyncTelnetServer::ProcessLine(AsyncClient* client, const String& line) {
         client->write(String(command + " - " + ASYNCTELNETSERVER_INVALIDCOMMAND + "\r\n\r\n").c_str());
     }
 
-    client->write(Prompt.c_str());
+    client->write(String(session->User + String(" ") + ASYNCTELNETSERVER_DEFAULTPROMPT).c_str());
 }
 
 uint8_t AsyncTelnetServer::SessionID(AsyncClient* client) {
