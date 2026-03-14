@@ -228,6 +228,17 @@ class settings_t {
                 [[nodiscard]] const String& WebHooksToken() const noexcept { return pWebHooksToken; }
                 void WebHooksToken(String value) noexcept;
         } WebServer;
+        class telnetserver_t {
+            private:
+                uint16_t pPort{};
+                bool pEnabled{};
+            public:
+                [[nodiscard]] uint16_t Port() const noexcept { return pPort; }
+                void Port(uint16_t value) { pPort = (value == 0) ? 23 : value; }
+
+                [[nodiscard]] bool Enabled() const noexcept { return pEnabled; }
+                void Enabled(bool value) noexcept { pEnabled = value; }
+        } TelnetServer;
         class mqtt_t {
             private:
                 bool pEnabled{};

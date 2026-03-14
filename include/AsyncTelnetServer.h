@@ -6,6 +6,7 @@
 #include <Arduino.h>
 #include <AsyncTCP.h>
 #include <vector>
+#include <functional>
 
 #define ASYNCTELNETSERVER_MAXCOMMANDPARAMETERS  10
 #define ASYNCTELNETSERVER_DEFAULTPROMPT         "> "
@@ -21,28 +22,33 @@
 #define ASYNCTELNETSERVER_INVALIDCOMMAND        "Invalid command."
 #define ASYNCTELNETSERVER_GUESTUSER             "guest"
 
+class AsyncTelnetSession;
+
 typedef std::function<void(AsyncClient* client)> telnet_callback_t;
+typedef std::function<void(AsyncClient* client, AsyncTelnetSession* session)> telnet_session_callback_t;
 
-enum AsyncTelnetMode { ASYNCTELNETMODE_CHAR, ASYNCTELNETMODE_LINE };
-
+enum AsyncTelnetMode {
+    ASYNCTELNETMODE_CHAR,
+    ASYNCTELNETMODE_LINE
+};
 
 static struct protcmd {
-    const uint8_t SE = 240;                     // Subnegotiation End
-    const uint8_t NOP = 241;                    // No Operation
-    const uint8_t DM = 242;                     // Data Mark
-    const uint8_t BRK = 243;                    // Break
-    const uint8_t IP = 244;                     // Interrupt Process
-    const uint8_t AO = 245;                     // Abort Output
-    const uint8_t AYT = 246;                    // Are You There
-    const uint8_t EC = 247;                     // Erase Character
-    const uint8_t EL = 248;                     // Erase Line
-    const uint8_t GA = 249;                     // Go Ahead
-    const uint8_t SB = 250;                     // Subnegotiation Begin
-    const uint8_t WILL = 251;                   // Will
-    const uint8_t WONT = 252;                   // Won't
-    const uint8_t DO = 253;                     // Do
-    const uint8_t DONT = 254;                   // Don't
-    const uint8_t IAC = 255;                    // Interpret As Command
+    const uint8_t SE   = 240;
+    const uint8_t NOP  = 241;
+    const uint8_t DM   = 242;
+    const uint8_t BRK  = 243;
+    const uint8_t IP   = 244;
+    const uint8_t AO   = 245;
+    const uint8_t AYT  = 246;
+    const uint8_t EC   = 247;
+    const uint8_t EL   = 248;
+    const uint8_t GA   = 249;
+    const uint8_t SB   = 250;
+    const uint8_t WILL = 251;
+    const uint8_t WONT = 252;
+    const uint8_t DO   = 253;
+    const uint8_t DONT = 254;
+    const uint8_t IAC  = 255;
 } PROTCMD;
 
 class AsyncTelnetCommand {
@@ -58,39 +64,51 @@ class AsyncTelnetSession {
         IPAddress RemoteIP;
         uint16_t RemotePort;
         String User;
+        String InputBuffer;
+        String LastInput;
 };
 
 class AsyncTelnetServer {
     private:
-        AsyncServer* mAsyncServer;
-
+        AsyncServer* mAsyncServer = nullptr;
         AsyncTelnetMode mMode = ASYNCTELNETMODE_LINE;
-        
         uint16_t mPort;
-        String mIncomeData = "";
-        String mLastIncomeData;
-        String mCommand;
-        String* mParameter = new String[ASYNCTELNETSERVER_MAXCOMMANDPARAMETERS];
-        
+
         std::vector<AsyncTelnetCommand*> mCommandList;
         std::vector<AsyncTelnetSession*> mSessions;
         std::vector<String> mUsers;
-    
+
+        AsyncTelnetSession* FindSession(AsyncClient* client);
+        void RemoveSession(AsyncClient* client);
+        void HandleNegotiation(AsyncClient* client, const uint8_t* data, size_t len, size_t& index);
+        void ProcessLine(AsyncClient* client, const String& line);
+
     public:
         AsyncTelnetServer(uint16_t port);
-        ~AsyncTelnetServer() {}
-        
-        inline uint16_t Port() { return mPort; }
-        
+        ~AsyncTelnetServer();
+
         String Prompt = ASYNCTELNETSERVER_DEFAULTPROMPT;
         String WelcomeMessage = ASYNCTELNETSERVER_DEFAULTWELCOMEMESSAGE;
-        
-        inline AsyncTelnetSession* CurrentSession(AsyncClient* client) { return mSessions[SessionID(client) - 1]; }
-        uint8_t SessionID(AsyncClient* client);
-        inline void onCommand(String command, String helpmessage, telnet_callback_t callback, bool admincommand = false) { mCommandList.push_back(new AsyncTelnetCommand({command, helpmessage, callback, admincommand})); };
 
-        inline void begin() { if (mAsyncServer != nullptr) mAsyncServer->begin(); }
-        inline void end() { if (mAsyncServer != nullptr) mAsyncServer->end(); }
+        telnet_session_callback_t onSessionBegin = nullptr;
+        telnet_session_callback_t onSessionEnd = nullptr;
+
+        inline uint16_t Port() { return mPort; }
+
+        AsyncTelnetSession* CurrentSession(AsyncClient* client);
+        uint8_t SessionID(AsyncClient* client);
+
+        inline void onCommand(String command, String helpmessage, telnet_callback_t callback, bool admincommand = false) {
+            mCommandList.push_back(new AsyncTelnetCommand({command, helpmessage, callback, admincommand}));
+        }
+
+        inline void begin() {
+            if (mAsyncServer != nullptr) mAsyncServer->begin();
+        }
+
+        inline void end() {
+            if (mAsyncServer != nullptr) mAsyncServer->end();
+        }
 };
 
 #endif

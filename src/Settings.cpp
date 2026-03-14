@@ -567,6 +567,10 @@ void settings_t::LoadDefaults() {
     WebServer.Enabled(Defaults.WebServer.Enabled);
     WebServer.WebHooksToken(Defaults.WebServer.WebHooksToken);
 
+    // TelnetServer
+    TelnetServer.Port(Defaults.TelnetServer.Port);
+    TelnetServer.Enabled(Defaults.TelnetServer.Enabled);
+
     // MQTT
     MQTT.Enabled(Defaults.MQTT.Enabled);
     MQTT.Broker(Defaults.MQTT.Broker);

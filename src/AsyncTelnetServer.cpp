@@ -1,13 +1,13 @@
 #include "AsyncTelnetServer.h"
 
-AsyncTelnetServer::AsyncTelnetServer(uint16_t port) : mPort(port) {    
+AsyncTelnetServer::AsyncTelnetServer(uint16_t port) : mPort(port) {
     onCommand(ASYNCTELNETSERVER_CMD_CLEAR, ASYNCTELNETSERVER_HLP_CLEAR, [&](AsyncClient* client) {
-        client->write(String("\x1B[2J\x1B[H").c_str());
+        client->write("\x1B[2J\x1B[H");
     });
 
     onCommand(ASYNCTELNETSERVER_CMD_EXIT, ASYNCTELNETSERVER_HLP_EXIT, [&](AsyncClient* client) {
-        mSessions.erase(mSessions.begin() + (SessionID(client) - 1));
         client->write("Session closed.\r\n\r\n");
+        RemoveSession(client);
         client->stop();
     });
 
@@ -19,108 +19,281 @@ AsyncTelnetServer::AsyncTelnetServer(uint16_t port) : mPort(port) {
     });
 
     onCommand(ASYNCTELNETSERVER_CMD_WHOAMI, ASYNCTELNETSERVER_HLP_WHOAMI, [&](AsyncClient* client) {
-        client->write(String(CurrentSession(client)->User + "@" + client->remoteIP().toString() + ":" + String(client->remotePort()) + "\r\n").c_str());
+        AsyncTelnetSession* session = CurrentSession(client);
+        if (session != nullptr) {
+            client->write(String(session->User + "@" + client->remoteIP().toString() + ":" + String(client->remotePort()) + "\r\n").c_str());
+        } else {
+            client->write("Unknown session\r\n");
+        }
     });
 
     mAsyncServer = new AsyncServer(mPort);
 
-    mAsyncServer->onClient([&](void* s, AsyncClient* client) {
-        mSessions.push_back(new AsyncTelnetSession({client->remoteIP(), client->remotePort(), ASYNCTELNETSERVER_GUESTUSER}));
-
-        char cmd[] = {
-            PROTCMD.IAC, PROTCMD.DO, 34
+    mAsyncServer->onClient([&](void* arg, AsyncClient* client) {
+        AsyncTelnetSession* session = new AsyncTelnetSession{
+            client->remoteIP(),
+            client->remotePort(),
+            ASYNCTELNETSERVER_GUESTUSER,
+            "",
+            ""
         };
-        
-        client->write(cmd, sizeof(cmd));
-        
+
+        mSessions.push_back(session);
+
+        if (onSessionBegin != nullptr) {
+            onSessionBegin(client, session);
+        }
+
         client->write(String(WelcomeMessage + "\r\n\r\n" + Prompt).c_str());
 
         client->onData([&](void* arg, AsyncClient* client, void* data, size_t len) {
-            char tmp[len];
-            memcpy(tmp, (char*)data, len);
+            AsyncTelnetSession* session = FindSession(client);
+            if (session == nullptr || data == nullptr || len == 0) return;
 
-            // if (tmp[0] == PROTCMD.IAC) { // Negociation
-            //     // for (uint32_t i = 0; i < len; i++) {
-            //     //     if ((tmp[i] == PROTCMD.IAC) && (tmp[i + 1] == PROTCMD.WONT) && (tmp[i + 2] == 34)) {
-            //     //         mMode = ASYNCTELNETMODE_CHAR;
-            //     //     } else {
-            //     //         mMode = ASYNCTELNETMODE_LINE;
-            //     //     }
-            //     // }
-            //     return;
-            // }
-            
-            if (client->space() > 32 && client->canSend()) {
-                // if (mMode == ASYNCTELNETMODE_LINE) {
-                    mIncomeData = String((char*)data).substring(0, len);
-                // } else if (mMode == ASYNCTELNETMODE_CHAR) {
-                //     char c = tmp[0];
-                    
-                //     if (((uint8_t)c == 10) || ((uint8_t)c == 13)) {
-                //         client->write(String("\r\n").c_str());
-                //     } else {
-                //         mIncomeData += c;
-                //         client->write(String(c).c_str());
-                //         return;
-                //     }
-                // }
+            const uint8_t* bytes = static_cast<const uint8_t*>(data);
 
-                mIncomeData.trim();
+            for (size_t i = 0; i < len; i++) {
+                uint8_t b = bytes[i];
 
-                if (mIncomeData.equals("."))
-                    mIncomeData = mLastIncomeData; // Restore last command and parammeters
-                else
-                    if (mIncomeData.length() > 0) mLastIncomeData = mIncomeData; // Save last command and parammeters
+                if (b == PROTCMD.IAC) {
+                    HandleNegotiation(client, bytes, len, i);
+                    continue;
+                }
 
-                mCommand = mIncomeData.substring(0, mIncomeData.indexOf(' '));
-                mIncomeData = mIncomeData.substring(mCommand.length() + 1, mIncomeData.length());
+                if (b == 8 || b == 127) {
+                    if (session->InputBuffer.length() > 0) {
+                        session->InputBuffer.remove(session->InputBuffer.length() - 1);
+                    }
+                    continue;
+                }
 
-                for (uint8_t i = 0; i < ASYNCTELNETSERVER_MAXCOMMANDPARAMETERS; i++) {
-                    if (mIncomeData.isEmpty() == false) {
-                        mParameter[i] = mIncomeData.substring(0, mIncomeData.indexOf(' '));
-                        mIncomeData = mIncomeData.substring(mParameter[i].length() + 1, mIncomeData.length());
+                if (b == '\r' || b == '\n') {
+                    if (session->InputBuffer.length() > 0) {
+                        client->write("\r\n");
+                        String line = session->InputBuffer;
+                        session->InputBuffer.clear();
+                        ProcessLine(client, line);
                     } else {
-                        mParameter[i].clear();
-                    }
-                }
-
-                mIncomeData.clear();
-
-                if (mCommand.isEmpty() == false) {
-                    bool ValidCommand = false;
-
-                    for (AsyncTelnetCommand* cmd : mCommandList) {
-                        if (mCommand == cmd->Command) {
-                            if ((mParameter[0].equalsIgnoreCase("-h")) || (mParameter[0].equalsIgnoreCase("-?")) || (mParameter[0].equalsIgnoreCase("--help"))) {
-                                client->write(String(cmd->HelpMessage + "\r\n\r\n").c_str());
-                            } else {
-                                cmd->Callback(client);
-                                if(cmd->Command.equals(ASYNCTELNETSERVER_CMD_CLEAR) == false) client->write("\r\n");
-                            }
-
-                            ValidCommand = true;
-                            break;
-                        }
+                        client->write("\r\n");
+                        client->write(Prompt.c_str());
                     }
 
-                    if (ValidCommand == false) client->write(String(mCommand + " - " + ASYNCTELNETSERVER_INVALIDCOMMAND + "\r\n\r\n").c_str());
+                    if (b == '\r' && (i + 1 < len) && bytes[i + 1] == '\n') {
+                        i++;
+                    }
+
+                    continue;
                 }
-                
-                client->write(Prompt.c_str());
+
+                if (b >= 32 && b <= 126) {
+                    session->InputBuffer += static_cast<char>(b);
+                }
             }
-        });
+        }, nullptr);
 
-        client->onDisconnect([&](void* arg, AsyncClient* client) {}, NULL);
-        client->onError([&](void* arg, AsyncClient* client, int8_t error) {}, NULL);
-        client->onTimeout([&](void* arg, AsyncClient* client, uint32_t time) {}, NULL);
-    }, NULL);
+        client->onDisconnect([&](void* arg, AsyncClient* client) {
+            RemoveSession(client);
+        }, nullptr);
+
+        client->onError([&](void* arg, AsyncClient* client, int8_t error) {
+            RemoveSession(client);
+        }, nullptr);
+
+        client->onTimeout([&](void* arg, AsyncClient* client, uint32_t time) {
+            RemoveSession(client);
+            client->stop();
+        }, nullptr);
+    }, nullptr);
+}
+
+AsyncTelnetServer::~AsyncTelnetServer() {
+    if (mAsyncServer != nullptr) {
+        mAsyncServer->end();
+        delete mAsyncServer;
+        mAsyncServer = nullptr;
+    }
+
+    for (AsyncTelnetCommand* cmd : mCommandList) {
+        delete cmd;
+    }
+    mCommandList.clear();
+
+    for (AsyncTelnetSession* session : mSessions) {
+        delete session;
+    }
+    mSessions.clear();
+}
+
+AsyncTelnetSession* AsyncTelnetServer::FindSession(AsyncClient* client) {
+    if (client == nullptr) return nullptr;
+
+    for (AsyncTelnetSession* session : mSessions) {
+        if ((session->RemoteIP == client->remoteIP()) &&
+            (session->RemotePort == client->remotePort())) {
+            return session;
+        }
+    }
+
+    return nullptr;
+}
+
+AsyncTelnetSession* AsyncTelnetServer::CurrentSession(AsyncClient* client) {
+    return FindSession(client);
+}
+
+void AsyncTelnetServer::RemoveSession(AsyncClient* client) {
+    if (client == nullptr) return;
+
+    for (auto it = mSessions.begin(); it != mSessions.end(); ++it) {
+        AsyncTelnetSession* session = *it;
+
+        if ((session->RemoteIP == client->remoteIP()) &&
+            (session->RemotePort == client->remotePort())) {
+
+            if (onSessionEnd != nullptr) {
+                onSessionEnd(client, session);
+            }
+
+            delete session;
+            mSessions.erase(it);
+            break;
+        }
+    }
+}
+
+void AsyncTelnetServer::HandleNegotiation(AsyncClient* client, const uint8_t* data, size_t len, size_t& index) {
+    if (client == nullptr || data == nullptr) return;
+    if (index + 1 >= len) return;
+
+    uint8_t cmd = data[index + 1];
+
+    if (cmd == PROTCMD.IAC) {
+        index += 1;
+        return;
+    }
+
+    if (cmd == PROTCMD.DO || cmd == PROTCMD.DONT || cmd == PROTCMD.WILL || cmd == PROTCMD.WONT) {
+        if (index + 2 >= len) return;
+
+        uint8_t opt = data[index + 2];
+        uint8_t reply[3] = { PROTCMD.IAC, 0, opt };
+
+        if (cmd == PROTCMD.WILL) {
+            reply[1] = PROTCMD.DONT;
+            client->write(reinterpret_cast<const char*>(reply), 3);
+        } else if (cmd == PROTCMD.DO) {
+            reply[1] = PROTCMD.WONT;
+            client->write(reinterpret_cast<const char*>(reply), 3);
+        }
+
+        index += 2;
+        return;
+    }
+
+    if (cmd == PROTCMD.SB) {
+        size_t j = index + 2;
+        while (j + 1 < len) {
+            if (data[j] == PROTCMD.IAC && data[j + 1] == PROTCMD.SE) {
+                index = j + 1;
+                return;
+            }
+            j++;
+        }
+
+        index = len - 1;
+        return;
+    }
+
+    index += 1;
+}
+
+void AsyncTelnetServer::ProcessLine(AsyncClient* client, const String& line) {
+    AsyncTelnetSession* session = FindSession(client);
+    if (session == nullptr) return;
+
+    String incomeData = line;
+    incomeData.trim();
+
+    if (incomeData.equals(".")) {
+        incomeData = session->LastInput;
+    } else if (incomeData.length() > 0) {
+        session->LastInput = incomeData;
+    }
+
+    if (incomeData.isEmpty()) {
+        client->write(Prompt.c_str());
+        return;
+    }
+
+    String command;
+    String parameters;
+    String parameter[ASYNCTELNETSERVER_MAXCOMMANDPARAMETERS];
+
+    int firstSpace = incomeData.indexOf(' ');
+    if (firstSpace < 0) {
+        command = incomeData;
+        parameters = "";
+    } else {
+        command = incomeData.substring(0, firstSpace);
+        parameters = incomeData.substring(firstSpace + 1);
+        parameters.trim();
+    }
+
+    for (uint8_t i = 0; i < ASYNCTELNETSERVER_MAXCOMMANDPARAMETERS; i++) {
+        if (parameters.isEmpty()) {
+            parameter[i] = "";
+            continue;
+        }
+
+        int nextSpace = parameters.indexOf(' ');
+        if (nextSpace < 0) {
+            parameter[i] = parameters;
+            parameters = "";
+        } else {
+            parameter[i] = parameters.substring(0, nextSpace);
+            parameters = parameters.substring(nextSpace + 1);
+            parameters.trim();
+        }
+    }
+
+    bool validCommand = false;
+
+    for (AsyncTelnetCommand* cmd : mCommandList) {
+        if (command == cmd->Command) {
+            if (parameter[0].equalsIgnoreCase("-h") ||
+                parameter[0].equalsIgnoreCase("-?") ||
+                parameter[0].equalsIgnoreCase("--help")) {
+                client->write(String(cmd->HelpMessage + "\r\n\r\n").c_str());
+            } else {
+                cmd->Callback(client);
+                if (cmd->Command != ASYNCTELNETSERVER_CMD_CLEAR) {
+                    client->write("\r\n");
+                }
+            }
+
+            validCommand = true;
+            break;
+        }
+    }
+
+    if (!validCommand) {
+        client->write(String(command + " - " + ASYNCTELNETSERVER_INVALIDCOMMAND + "\r\n\r\n").c_str());
+    }
+
+    client->write(Prompt.c_str());
 }
 
 uint8_t AsyncTelnetServer::SessionID(AsyncClient* client) {
+    if (client == nullptr) return 0;
+
     uint8_t ret = 0;
     for (AsyncTelnetSession* session : mSessions) {
         ret++;
-        if ((session->RemoteIP == client->remoteIP()) && (session->RemotePort == client->remotePort())) return ret;
+        if ((session->RemoteIP == client->remoteIP()) &&
+            (session->RemotePort == client->remotePort())) {
+            return ret;
+        }
     }
+
     return 0;
 }

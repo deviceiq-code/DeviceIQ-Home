@@ -56,6 +56,10 @@ struct defaults_t {
         const bool Enabled = true;
         const char* WebHooksToken = "default_token";
     } WebServer;
+    struct telnetserver_t {
+        const uint16_t Port = 23;
+        const bool Enabled = true;
+    } TelnetServer;
     struct mqtt_t {
         const bool Enabled = false;
         const char* Broker = "";

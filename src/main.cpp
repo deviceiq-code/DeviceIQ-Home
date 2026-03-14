@@ -162,6 +162,23 @@ void setup() {
             case WifiClient: {
                 devLog->Write("Network: " + devNetwork->Hostname() + " MAC " + devNetwork->MAC_Address() + " connected to " + devNetwork->SSID() + " IP " + devNetwork->IP_Address().toString(), LOGLEVEL_INFO);
 
+                // Telnet Server
+                if (Settings.TelnetServer.Enabled() == true) {
+                    devTelnetServer = new AsyncTelnetServer(Settings.TelnetServer.Port());
+                    
+                    devTelnetServer->onSessionBegin = [&](AsyncClient* client, AsyncTelnetSession* session) {
+                        devLog->Write("Telnet Server: Session started (" + String(session->RemoteIP.toString() + ":" + session->RemotePort) + ")", LOGLEVEL_INFO);
+                    };
+                    devTelnetServer->onSessionEnd = [&](AsyncClient* client, AsyncTelnetSession* session) {
+                        devLog->Write("Telnet Server: Session ended (" + String(session->RemoteIP.toString() + ":" + session->RemotePort) + ")", LOGLEVEL_INFO);
+                    };
+
+                    devTelnetServer->begin();
+                    devLog->Write("Telnet Server: Enabled on port " + String(Settings.TelnetServer.Port()), LOGLEVEL_INFO);
+                } else {
+                    devLog->Write("Telnet Server: Disabled", LOGLEVEL_INFO);
+                }
+
                 // NTP
                 // if (Settings.General.NTPUpdate()) {
                 //     if (devClock->NTPUpdate(Settings.General.NTPServer())) {
