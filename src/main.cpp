@@ -165,12 +165,14 @@ void setup() {
                 // Telnet Server
                 if (Settings.TelnetServer.Enabled() == true) {
                     devTelnetServer = new AsyncTelnetServer(Settings.TelnetServer.Port());
+
+                    devTelnetServer->WelcomeMessage = Version.ProductFamily + " " + Settings.Network.Hostname() + " - Welcome";
                     
                     devTelnetServer->onSessionBegin = [&](AsyncClient* client, AsyncTelnetSession* session) {
-                        devLog->Write("Telnet Server: Session started (" + String(session->RemoteIP.toString() + ":" + session->RemotePort) + ")", LOGLEVEL_INFO);
+                        devLog->Write("Telnet Server: Session started " + String(session->User + "@" + session->RemoteIP.toString() + ":" + session->RemotePort), LOGLEVEL_INFO);
                     };
                     devTelnetServer->onSessionEnd = [&](AsyncClient* client, AsyncTelnetSession* session) {
-                        devLog->Write("Telnet Server: Session ended (" + String(session->RemoteIP.toString() + ":" + session->RemotePort) + ")", LOGLEVEL_INFO);
+                        devLog->Write("Telnet Server: Session ended " + String(session->User + "@" + session->RemoteIP.toString() + ":" + session->RemotePort), LOGLEVEL_INFO);
                     };
 
                     devTelnetServer->begin();

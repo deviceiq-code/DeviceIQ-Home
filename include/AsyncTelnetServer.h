@@ -9,6 +9,7 @@
 #include <functional>
 
 #define ASYNCTELNETSERVER_MAXCOMMANDPARAMETERS  10
+#define ASYNCTELNETSERVER_HELPCOMMANDSPERLINE   3
 #define ASYNCTELNETSERVER_DEFAULTPROMPT         "> "
 #define ASYNCTELNETSERVER_CMD_CLEAR             "clear"
 #define ASYNCTELNETSERVER_HLP_CLEAR             "Clear terminal screen\r\n\r\nclear"
@@ -18,13 +19,15 @@
 #define ASYNCTELNETSERVER_HLP_SESSIONS          "Show current Telnet sessions\r\n\r\nsessions"
 #define ASYNCTELNETSERVER_CMD_WHOAMI            "whoami"
 #define ASYNCTELNETSERVER_HLP_WHOAMI            "Show information about current user\r\n\r\nwhoami"
+#define ASYNCTELNETSERVER_CMD_HELP              "help"
+#define ASYNCTELNETSERVER_HLP_HELP              "Show available commands\r\n\r\nhelp"
 #define ASYNCTELNETSERVER_DEFAULTWELCOMEMESSAGE "Async Telnet Server - Welcome"
 #define ASYNCTELNETSERVER_INVALIDCOMMAND        "Invalid command."
 #define ASYNCTELNETSERVER_GUESTUSER             "guest"
 
 class AsyncTelnetSession;
 
-typedef std::function<void(AsyncClient* client)> telnet_callback_t;
+typedef std::function<void(AsyncClient* client, String* parameter)> telnet_callback_t;
 typedef std::function<void(AsyncClient* client, AsyncTelnetSession* session)> telnet_session_callback_t;
 
 enum AsyncTelnetMode {

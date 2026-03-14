@@ -1,30 +1,82 @@
 #include "AsyncTelnetServer.h"
 
 AsyncTelnetServer::AsyncTelnetServer(uint16_t port) : mPort(port) {
-    onCommand(ASYNCTELNETSERVER_CMD_CLEAR, ASYNCTELNETSERVER_HLP_CLEAR, [&](AsyncClient* client) {
+    onCommand(ASYNCTELNETSERVER_CMD_CLEAR, ASYNCTELNETSERVER_HLP_CLEAR, [&](AsyncClient* client, String* parameter) {
         client->write("\x1B[2J\x1B[H");
     });
 
-    onCommand(ASYNCTELNETSERVER_CMD_EXIT, ASYNCTELNETSERVER_HLP_EXIT, [&](AsyncClient* client) {
+    onCommand(ASYNCTELNETSERVER_CMD_EXIT, ASYNCTELNETSERVER_HLP_EXIT, [&](AsyncClient* client, String* parameter) {
         client->write("Session closed.\r\n\r\n");
         RemoveSession(client);
         client->stop();
     });
 
-    onCommand(ASYNCTELNETSERVER_CMD_SESSIONS, ASYNCTELNETSERVER_HLP_SESSIONS, [&](AsyncClient* client) {
+    onCommand(ASYNCTELNETSERVER_CMD_SESSIONS, ASYNCTELNETSERVER_HLP_SESSIONS, [&](AsyncClient* client, String* parameter) {
         client->write("Current sessions:\r\n\r\n");
         for (AsyncTelnetSession* session : mSessions) {
             client->write(String(session->User + "@" + session->RemoteIP.toString() + ":" + String(session->RemotePort) + "\r\n").c_str());
         }
     });
 
-    onCommand(ASYNCTELNETSERVER_CMD_WHOAMI, ASYNCTELNETSERVER_HLP_WHOAMI, [&](AsyncClient* client) {
+    onCommand(ASYNCTELNETSERVER_CMD_WHOAMI, ASYNCTELNETSERVER_HLP_WHOAMI, [&](AsyncClient* client, String* parameter) {
         AsyncTelnetSession* session = CurrentSession(client);
         if (session != nullptr) {
             client->write(String(session->User + "@" + client->remoteIP().toString() + ":" + String(client->remotePort()) + "\r\n").c_str());
         } else {
             client->write("Unknown session\r\n");
         }
+    });
+
+    onCommand(ASYNCTELNETSERVER_CMD_HELP, ASYNCTELNETSERVER_HLP_HELP, [&](AsyncClient* client, String* parameter) {
+        if (parameter[0].isEmpty()) {
+            client->write(String("Available commands:\r\n\r\n").c_str());
+
+            String out;
+            size_t maxLen = 0;
+            for (AsyncTelnetCommand* cmd : mCommandList) if (cmd->Command.length() > maxLen) maxLen = cmd->Command.length();
+
+            size_t colWidth = maxLen + 4;
+            uint16_t colCount = ASYNCTELNETSERVER_HELPCOMMANDSPERLINE;
+            uint16_t currentCol = 0;
+
+            for (AsyncTelnetCommand* cmd : mCommandList) {
+                out = cmd->Command;
+
+                while (out.length() < colWidth) out += ' ';
+                client->write(out.c_str());
+
+                currentCol++;
+
+                if (currentCol >= colCount) {
+                    client->write("\r\n");
+                    currentCol = 0;
+                }
+            }
+
+            if (currentCol != 0) client->write("\r\n");
+            
+            out = "\r\n\r\nUse . to repeat last command.\r\n";
+            client->write(out.c_str());
+        } else {
+            bool ValidCommand = false;
+            for (AsyncTelnetCommand* cmd : mCommandList) {
+                if (parameter[0] == cmd->Command) {
+                    client->write(String(cmd->HelpMessage + "\r\n").c_str());
+                    ValidCommand = true;
+                    break;
+                }
+            }
+
+            if (!ValidCommand) client->write(String(parameter[0] + " - Invalid command.\r\n").c_str());
+        }
+    });
+
+    onCommand("echo", "Echo text\r\n\r\necho text", [&](AsyncClient* client, String* parameter) {
+        String Text;
+        for (uint8_t n = 0; n < ASYNCTELNETSERVER_MAXCOMMANDPARAMETERS; n++)
+            if (!parameter[n].isEmpty()) Text += (Text.isEmpty() ? "" : " ") + parameter[n];
+
+        client->write(String(Text + "\r\n").c_str());
     });
 
     mAsyncServer = new AsyncServer(mPort);
@@ -44,7 +96,7 @@ AsyncTelnetServer::AsyncTelnetServer(uint16_t port) : mPort(port) {
             onSessionBegin(client, session);
         }
 
-        client->write(String(WelcomeMessage + "\r\n\r\n" + Prompt).c_str());
+        client->write(String("\r\n" + WelcomeMessage + "\r\n\r\n" + Prompt).c_str());
 
         client->onData([&](void* arg, AsyncClient* client, void* data, size_t len) {
             AsyncTelnetSession* session = FindSession(client);
@@ -260,12 +312,10 @@ void AsyncTelnetServer::ProcessLine(AsyncClient* client, const String& line) {
 
     for (AsyncTelnetCommand* cmd : mCommandList) {
         if (command == cmd->Command) {
-            if (parameter[0].equalsIgnoreCase("-h") ||
-                parameter[0].equalsIgnoreCase("-?") ||
-                parameter[0].equalsIgnoreCase("--help")) {
+            if (parameter[0].equalsIgnoreCase("-h") || parameter[0].equalsIgnoreCase("-?") || parameter[0].equalsIgnoreCase("--help")) {
                 client->write(String(cmd->HelpMessage + "\r\n\r\n").c_str());
             } else {
-                cmd->Callback(client);
+                cmd->Callback(client, parameter);
                 if (cmd->Command != ASYNCTELNETSERVER_CMD_CLEAR) {
                     client->write("\r\n");
                 }
