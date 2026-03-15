@@ -112,6 +112,12 @@ UserReturn users_t::Find(const String& username, user_t** outUser) {
     return UserReturn::UserNotFound;
 }
 
+bool users_t::IsAdmin(const String& username) {
+    user_t* user = nullptr;
+    if (Find(username, &user) == UserReturn::OK) return user->Admin();
+    return false;
+}
+
 void settings_t::network_t::Hostname(String value) noexcept {
     value.trim();
     value.toLowerCase();

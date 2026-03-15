@@ -52,8 +52,6 @@ AsyncTelnetServer::AsyncTelnetServer(uint16_t port) : mPort(port) {
                     currentCol = 0;
                 }
             }
-
-            if (currentCol != 0) client->write("\r\n");
             
             out = "\r\n\r\nUse . to repeat last command.\r\n";
             client->write(out.c_str());
@@ -71,7 +69,7 @@ AsyncTelnetServer::AsyncTelnetServer(uint16_t port) : mPort(port) {
         }
     });
 
-    onCommand("echo", "Echo text\r\n\r\necho text", [&](AsyncClient* client, String* parameter) {
+    onCommand(ASYNCTELNETSERVER_CMD_ECHO, ASYNCTELNETSERVER_HLP_ECHO, [&](AsyncClient* client, String* parameter) {
         String Text;
         for (uint8_t n = 0; n < ASYNCTELNETSERVER_MAXCOMMANDPARAMETERS; n++)
             if (!parameter[n].isEmpty()) Text += (Text.isEmpty() ? "" : " ") + parameter[n];
@@ -96,7 +94,7 @@ AsyncTelnetServer::AsyncTelnetServer(uint16_t port) : mPort(port) {
             onSessionBegin(client, session);
         }
 
-        client->write(String("\r\n" + WelcomeMessage + "\r\n\r\n" + ASYNCTELNETSERVER_GUESTUSER + String(" ") + ASYNCTELNETSERVER_DEFAULTPROMPT).c_str());
+        client->write(String("\r\n" + WelcomeMessage + "\r\n\r\n" + ASYNCTELNETSERVER_GUESTUSER + " " + ASYNCTELNETSERVER_DEFAULTPROMPT).c_str());
 
         client->onData([&](void* arg, AsyncClient* client, void* data, size_t len) {
             AsyncTelnetSession* session = FindSession(client);
@@ -127,7 +125,7 @@ AsyncTelnetServer::AsyncTelnetServer(uint16_t port) : mPort(port) {
                         ProcessLine(client, line);
                     } else {
                         client->write("\r\n");
-                        client->write(String(session->User + String(" ") + ASYNCTELNETSERVER_DEFAULTPROMPT).c_str());
+                        client->write(String(session->User + " " + ASYNCTELNETSERVER_DEFAULTPROMPT).c_str());
                     }
 
                     if (b == '\r' && (i + 1 < len) && bytes[i + 1] == '\n') {
@@ -273,7 +271,7 @@ void AsyncTelnetServer::ProcessLine(AsyncClient* client, const String& line) {
     }
 
     if (incomeData.isEmpty()) {
-        client->write(String(session->User + String(" ") + ASYNCTELNETSERVER_DEFAULTPROMPT).c_str());
+        client->write(String(session->User + " " + ASYNCTELNETSERVER_DEFAULTPROMPT).c_str());
         return;
     }
 
@@ -312,6 +310,15 @@ void AsyncTelnetServer::ProcessLine(AsyncClient* client, const String& line) {
 
     for (AsyncTelnetCommand* cmd : mCommandList) {
         if (command == cmd->Command) {
+            validCommand = true;
+
+            AsyncTelnetSession* session = CurrentSession(client);
+
+            if (cmd->Admin && session && !session->Admin) {
+                client->write(String(String(ASYNCTELNETSERVER_PERMISSIONDENIED) + "\r\n\r\n").c_str());
+                break;
+            }
+
             if (parameter[0].equalsIgnoreCase("-h") || parameter[0].equalsIgnoreCase("-?") || parameter[0].equalsIgnoreCase("--help")) {
                 client->write(String(cmd->HelpMessage + "\r\n\r\n").c_str());
             } else {
@@ -321,7 +328,6 @@ void AsyncTelnetServer::ProcessLine(AsyncClient* client, const String& line) {
                 }
             }
 
-            validCommand = true;
             break;
         }
     }
@@ -330,7 +336,7 @@ void AsyncTelnetServer::ProcessLine(AsyncClient* client, const String& line) {
         client->write(String(command + " - " + ASYNCTELNETSERVER_INVALIDCOMMAND + "\r\n\r\n").c_str());
     }
 
-    client->write(String(session->User + String(" ") + ASYNCTELNETSERVER_DEFAULTPROMPT).c_str());
+    client->write(String(session->User + " " + ASYNCTELNETSERVER_DEFAULTPROMPT).c_str());
 }
 
 uint8_t AsyncTelnetServer::SessionID(AsyncClient* client) {

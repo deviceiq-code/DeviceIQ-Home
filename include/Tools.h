@@ -72,4 +72,6 @@ uint32_t CRC32_File(File& f);
 void Web_Content(String content, String mimetype, AsyncWebServerRequest *request, bool requires_authentication, bool static_content = false);
 String urlEncode(const String &str);
 
+inline void DeviceRestart() { esp_sleep_enable_timer_wakeup(200 * 1000); esp_deep_sleep_start(); }
+
 #endif

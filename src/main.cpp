@@ -175,15 +175,15 @@ void setup() {
                         devLog->Write("Telnet Server: Session ended " + String(session->User + "@" + session->RemoteIP.toString() + ":" + session->RemotePort), LOGLEVEL_INFO);
                     };
 
-                    devTelnetServer->onCommand("ver", "Show device version info", [&](AsyncClient* client, String* parameter) {
+                    devTelnetServer->onCommand("ver", "Show device version info\r\n\r\nver", [&](AsyncClient* client, String* parameter) {
                         client->write(String(Version.ProductFamily + " " + Version.Software.Info() + "\r\n").c_str());
                     });
 
-                    devTelnetServer->onCommand("mac", "Show device MAC address", [&](AsyncClient* client, String* parameter) {
+                    devTelnetServer->onCommand("mac", "Show device MAC address\r\n\r\nmac", [&](AsyncClient* client, String* parameter) {
                         client->write(String(devNetwork->MAC_Address() + "\r\n").c_str());
                     });
 
-                    devTelnetServer->onCommand("memory", "Show device memory information", [&](AsyncClient* client, String* parameter) {
+                    devTelnetServer->onCommand("memory", "Show device memory information\r\n\r\nmemory", [&](AsyncClient* client, String* parameter) {
                         uint32_t heapFree  = ESP.getFreeHeap();
                         uint32_t heapTotal = ESP.getHeapSize();
                         uint32_t heapMin   = ESP.getMinFreeHeap();
@@ -202,22 +202,19 @@ void setup() {
 
                         String result;
 
-                        result += "Heap\r\n";
-                        result += "  Free: " + String(heapFree) + " / " + String(heapTotal) + " bytes (" + String(heapPct, 1) + "%)\r\n";
-                        result += "  Minimum free: " + String(heapMin) + " bytes\r\n";
-                        result += "  Max allocatable block: " + String(heapMax) + " bytes\r\n";
+                        result += "Heap         | Free: " + String(heapFree) + " / " + String(heapTotal) + " bytes (" + String(heapPct, 1) + "%)\r\n";
+                        result += "             | Minimum free: " + String(heapMin) + " bytes\r\n";
+                        result += "             | Max allocatable block: " + String(heapMax) + " bytes\r\n\r\n";
 
-                        result += "\r\nInternal RAM\r\n";
-                        result += "  Free: " + String(internalFree) + " / " + String(internalTotal) + " bytes (" + String(internalPct, 1) + "%)\r\n";
-                        result += "  Minimum free: " + String(internalMin) + " bytes\r\n";
-
-                        result += "\r\nPSRAM\r\n";
-                        result += "  Free: " + String(psramFree) + " / " + String(psramTotal) + " bytes (" + String(psramPct, 1) + "%)\r\n";
+                        result += "Internal RAM | Free: " + String(internalFree) + " / " + String(internalTotal) + " bytes (" + String(internalPct, 1) + "%)\r\n";
+                        result += "             | Minimum free: " + String(internalMin) + " bytes\r\n\r\n";
+                        
+                        result += "PSRAM        | Free: " + String(psramFree) + " / " + String(psramTotal) + " bytes (" + String(psramPct, 1) + "%)\r\n";
 
                         client->write(result.c_str());
                     });
 
-                    devTelnetServer->onCommand("storage", "Show device storage information", [&](AsyncClient* client, String* parameter) {
+                    devTelnetServer->onCommand("storage", "Show device storage information\r\n\r\nstorage", [&](AsyncClient* client, String* parameter) {
                         uint32_t flashChipSize   = ESP.getFlashChipSize();
                         uint32_t flashChipSpeed  = ESP.getFlashChipSpeed();
                         uint32_t flashSketchSize = ESP.getSketchSize();
@@ -238,15 +235,13 @@ void setup() {
 
                         String result;
 
-                        result += "Flash\r\n";
-                        result += "  Chip size: " + String(flashChipSize) + " bytes\r\n";
-                        result += "  Chip speed: " + String(flashChipSpeed) + " Hz\r\n";
-                        result += "  Sketch size: " + String(flashSketchSize) + " / " + String(flashChipSize) + " bytes (" + String(flashSketchPct, 1) + "%)\r\n";
-                        result += "  Free sketch space: " + String(flashFreeSketch) + " / " + String(flashChipSize) + " bytes (" + String(flashFreePct, 1) + "%)\r\n";
-
-                        result += "\r\nFile System\r\n";
-                        result += "  Used: " + String(fsUsed) + " / " + String(fsTotal) + " bytes (" + String(fsUsedPct, 1) + "%)\r\n";
-                        result += "  Free: " + String(fsTotal - fsUsed) + " / " + String(fsTotal) + " bytes (" + String(fsFreePct, 1) + "%)\r\n";
+                        result += "Flash        | Chip size: " + String(flashChipSize) + " bytes\r\n";
+                        result += "             | Chip speed: " + String(flashChipSpeed) + " Hz\r\n";
+                        result += "             | Sketch size: " + String(flashSketchSize) + " / " + String(flashChipSize) + " bytes (" + String(flashSketchPct, 1) + "%)\r\n";
+                        result += "             | Free sketch space: " + String(flashFreeSketch) + " / " + String(flashChipSize) + " bytes (" + String(flashFreePct, 1) + "%)\r\n\r\n";
+                        
+                        result += "File System  | Used: " + String(fsUsed) + " / " + String(fsTotal) + " bytes (" + String(fsUsedPct, 1) + "%)\r\n";
+                        result += "             | Free: " + String(fsTotal - fsUsed) + " / " + String(fsTotal) + " bytes (" + String(fsFreePct, 1) + "%)\r\n";
 
                         client->write(result.c_str());
                     });
@@ -263,24 +258,25 @@ void setup() {
                                     
                                     if (session != nullptr) {
                                         session->User = parameter[0];
+                                        session->Admin = Settings.Users.IsAdmin(session->User);
                                     }
-
+                                    
                                     client->write(String("Logon successful for user " + parameter[0] + ".\r\n").c_str());
-                                    devLog->Write("Telnet Server: Logon successful for '" + parameter[0] + "@" + client->remoteIP().toString() + ":" + String(client->remotePort()) + "'", LOGLEVEL_INFO);
+                                    devLog->Write("Telnet Server: Logon successful for " + parameter[0] + "@" + client->remoteIP().toString() + ":" + String(client->remotePort()), LOGLEVEL_INFO);
                                     return;
                                 }
                                 break;
 
                                 case UserReturn::InvalidCredentials : {
                                     client->write(String("Logon failed for user " + parameter[0] + " - Invalid credentials.\r\n").c_str());
-                                    devLog->Write("Telnet Server: Logon failed for '" + parameter[0] + "@" + client->remoteIP().toString() + ":" + String(client->remotePort()) + "' - Invalid credentials", LOGLEVEL_WARNING);
+                                    devLog->Write("Telnet Server: Logon failed for " + parameter[0] + "@" + client->remoteIP().toString() + ":" + String(client->remotePort()) + " - Invalid credentials", LOGLEVEL_WARNING);
                                     return;
                                 }
                                 break;
 
                                 case UserReturn::UserNotFound : {
                                     client->write(String("Logon failed for user " + parameter[0] + " - user not found.\r\n").c_str());
-                                    devLog->Write("Telnet Server: Logon failed for '" + parameter[0] + "@" + client->remoteIP().toString() + ":" + String(client->remotePort()) + "' - User not found", LOGLEVEL_WARNING);
+                                    devLog->Write("Telnet Server: Logon failed for " + parameter[0] + "@" + client->remoteIP().toString() + ":" + String(client->remotePort()) + " - User not found", LOGLEVEL_WARNING);
                                     return;
                                 }
                                 break;
@@ -290,6 +286,10 @@ void setup() {
                             }
                         }
                     });
+
+                    devTelnetServer->onCommand("reboot", "Reboot the device\r\n\r\nreboot", [&](AsyncClient* client, String* parameter) {
+                        DeviceRestart();
+                    }, true);
 
                     devTelnetServer->begin();
                     devLog->Write("Telnet Server: Enabled on port " + String(Settings.TelnetServer.Port()), LOGLEVEL_INFO);

@@ -65,6 +65,7 @@ class users_t {
         UserReturn Remove(const String& username);
         UserReturn Authenticate(const String& username, const String& password, user_t** outUser = nullptr);
         UserReturn Find(const String& username, user_t** outUser = nullptr);
+        bool IsAdmin(const String& username);
 };
 
 class settings_t {

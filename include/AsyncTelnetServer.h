@@ -9,7 +9,7 @@
 #include <functional>
 
 #define ASYNCTELNETSERVER_MAXCOMMANDPARAMETERS  10
-#define ASYNCTELNETSERVER_HELPCOMMANDSPERLINE   3
+#define ASYNCTELNETSERVER_HELPCOMMANDSPERLINE   6
 #define ASYNCTELNETSERVER_DEFAULTPROMPT         "> "
 #define ASYNCTELNETSERVER_CMD_CLEAR             "clear"
 #define ASYNCTELNETSERVER_HLP_CLEAR             "Clear terminal screen\r\n\r\nclear"
@@ -19,10 +19,13 @@
 #define ASYNCTELNETSERVER_HLP_SESSIONS          "Show current Telnet sessions\r\n\r\nsessions"
 #define ASYNCTELNETSERVER_CMD_WHOAMI            "whoami"
 #define ASYNCTELNETSERVER_HLP_WHOAMI            "Show information about current user\r\n\r\nwhoami"
+#define ASYNCTELNETSERVER_CMD_ECHO              "echo"
+#define ASYNCTELNETSERVER_HLP_ECHO              "Display a text message in the console\r\n\r\necho message"
 #define ASYNCTELNETSERVER_CMD_HELP              "help"
 #define ASYNCTELNETSERVER_HLP_HELP              "Show available commands\r\n\r\nhelp"
 #define ASYNCTELNETSERVER_DEFAULTWELCOMEMESSAGE "Async Telnet Server - Welcome"
 #define ASYNCTELNETSERVER_INVALIDCOMMAND        "Invalid command."
+#define ASYNCTELNETSERVER_PERMISSIONDENIED      "Permission denied."
 #define ASYNCTELNETSERVER_GUESTUSER             "guest"
 
 class AsyncTelnetSession;
@@ -59,7 +62,7 @@ class AsyncTelnetCommand {
         String Command;
         String HelpMessage;
         telnet_callback_t Callback;
-        bool AdminCommand;
+        bool Admin;
 };
 
 class AsyncTelnetSession {
@@ -69,7 +72,7 @@ class AsyncTelnetSession {
         String User;
         String InputBuffer;
         String LastInput;
-        bool IsAdmin;
+        bool Admin;
 };
 
 class AsyncTelnetServer {
@@ -101,8 +104,8 @@ class AsyncTelnetServer {
         AsyncTelnetSession* CurrentSession(AsyncClient* client);
         uint8_t SessionID(AsyncClient* client);
 
-        inline void onCommand(String command, String helpmessage, telnet_callback_t callback, bool admincommand = false) {
-            mCommandList.push_back(new AsyncTelnetCommand({command, helpmessage, callback, admincommand}));
+        inline void onCommand(String command, String helpmessage, telnet_callback_t callback, bool admin = false) {
+            mCommandList.push_back(new AsyncTelnetCommand({command, helpmessage, callback, admin}));
         }
 
         inline void begin() {
