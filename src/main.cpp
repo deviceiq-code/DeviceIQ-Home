@@ -13,6 +13,13 @@
 #include <HTTPClient.h>
 #include <ESPAsyncWebServer.h>
 
+#include <lwip/sockets.h>
+#include <lwip/inet.h>
+#include <lwip/icmp.h>
+#include <lwip/ip4.h>
+#include <lwip/netdb.h>
+#include <lwip/inet_chksum.h>
+
 #include "AsyncTelnetServer.h"
 #include "Orchestrator.h"
 #include "Version.h"
@@ -291,6 +298,130 @@ void setup() {
                         DeviceRestart();
                     }, true);
 
+                    devTelnetServer->onCommand("ping", "Ping IP or host\r\n\r\nping [destination] [-n ntimes]", [&](AsyncClient* client, String* parameter) {
+                        if (parameter[0].isEmpty()) {
+                            client->write("Missing destination.\r\n");
+                            return;
+                        }
+
+                        String destination = parameter[0];
+
+                        struct hostent* host = gethostbyname(destination.c_str());
+                        if (!host) {
+                            client->write(String("ping: " + destination + ": Name or service not known\r\n").c_str());
+                            return;
+                        }
+
+                        struct sockaddr_in target;
+                        memset(&target, 0, sizeof(target));
+                        target.sin_family = AF_INET;
+                        target.sin_port = 0;
+                        target.sin_addr.s_addr = *(uint32_t*)host->h_addr;
+
+                        char ip[16];
+                        inet_ntoa_r(target.sin_addr, ip, sizeof(ip));
+
+                        bool isDnsName = true;
+                        ip_addr_t tmpAddr;
+                        if (ipaddr_aton(destination.c_str(), &tmpAddr)) {
+                            isDnsName = false;
+                        }
+
+                        if (isDnsName)
+                            client->write(String("PING " + destination + " (" + String(ip) + ") 32 bytes of data.\r\n").c_str());
+                        else
+                            client->write(String("PING " + destination + " 32 bytes of data.\r\n").c_str());
+
+                        int sock = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+                        if (sock < 0) {
+                            client->write("ping: cannot create socket\r\n");
+                            return;
+                        }
+
+                        struct timeval timeout;
+                        timeout.tv_sec = 1;
+                        timeout.tv_usec = 0;
+                        setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+
+                        uint16_t identifier = (uint16_t)(ESP.getEfuseMac() & 0xFFFF);
+
+                        uint32_t sentCount = 0;
+                        uint32_t recvCount = 0;
+                        uint32_t minTime = 0xFFFFFFFF;
+                        uint32_t maxTime = 0;
+                        uint32_t totalTime = 0;
+
+                        int ntimes = 4;
+                        if (parameter[1].equalsIgnoreCase("-n")) ntimes = parameter[2].toInt();
+
+                        for (int i = 0; i < ntimes; i++) {
+                            struct icmp_echo_hdr icmp;
+                            memset(&icmp, 0, sizeof(icmp));
+
+                            icmp.type = ICMP_ECHO;
+                            icmp.code = 0;
+                            icmp.id = htons(identifier);
+                            icmp.seqno = htons((uint16_t)i);
+
+                            uint8_t packet[32];
+                            memset(packet, 0, sizeof(packet));
+                            memcpy(packet, &icmp, sizeof(icmp));
+
+                            for (size_t j = sizeof(icmp); j < sizeof(packet); j++) packet[j] = (uint8_t)j;
+
+                            ((struct icmp_echo_hdr*)packet)->chksum = 0;
+                            ((struct icmp_echo_hdr*)packet)->chksum = inet_chksum(packet, sizeof(packet));
+
+                            uint32_t start = millis();
+
+                            int sent = sendto(sock, packet, sizeof(packet), 0, (struct sockaddr*)&target, sizeof(target));
+                            sentCount++;
+
+                            if (sent < 0) {
+                                client->write(String("From " + String(ip) + " icmp_seq=" + String(i + 1) + " send failed\r\n").c_str());
+                                delay(1000);
+                                continue;
+                            }
+
+                            uint8_t recvbuf[128];
+                            struct sockaddr_in from;
+                            socklen_t fromlen = sizeof(from);
+
+                            int len = recvfrom(sock, recvbuf, sizeof(recvbuf), 0, (struct sockaddr*)&from, &fromlen);
+                            uint32_t elapsed = millis() - start;
+
+                            if (len > 0) {
+                                recvCount++;
+                                totalTime += elapsed;
+                                if (elapsed < minTime) minTime = elapsed;
+                                if (elapsed > maxTime) maxTime = elapsed;
+
+                                char fromIp[16];
+                                inet_ntoa_r(from.sin_addr, fromIp, sizeof(fromIp));
+
+                                client->write(String(String(sizeof(packet)) + " bytes from " + String(fromIp) + ": icmp_seq=" + String(i + 1) + " ttl=64 time=" + String(elapsed) + " ms\r\n").c_str());
+                            } else {
+                                client->write(String("Request timeout for icmp_seq " + String(i + 1) + "\r\n").c_str());
+                            }
+
+                            delay(1000);
+                        }
+
+                        close(sock);
+
+                        uint32_t loss = 0;
+                        if (sentCount > 0) loss = ((sentCount - recvCount) * 100UL) / sentCount;
+
+                        client->write("\r\n");
+                        client->write(String("--- " + destination + " ping statistics ---\r\n").c_str());
+                        client->write(String(String(sentCount) + " packets transmitted, " + String(recvCount) + " received, " + String(loss) + "% packet loss\r\n").c_str());
+
+                        if (recvCount > 0) {
+                            uint32_t avgTime = totalTime / recvCount;
+                            client->write(String("rtt min/avg/max = " + String(minTime) + "/" + String(avgTime) + "/" + String(maxTime) + " ms\r\n").c_str());
+                        }
+                    }, true);
+
                     devTelnetServer->onCommand("network", "Show or change network configuration\r\n\r\nnet [options]", [&](AsyncClient* client, String* parameter) {
                         if (parameter[0].isEmpty()) {
                             String result;
@@ -329,6 +460,34 @@ void setup() {
                         client->write(result.c_str());
                     }, true);
 
+                    devTelnetServer->onCommand("mqtt", "Show or change MQTT configuration\r\n\r\nmqtt [options]", [&](AsyncClient* client, String* parameter) {
+                        if (!parameter[0].isEmpty()) {
+                            if (parameter[0].equalsIgnoreCase("enable")) {
+                                Settings.MQTT.Enabled(true);
+                            } else if (parameter[0].equalsIgnoreCase("disable")) {
+                                Settings.MQTT.Enabled(false);
+                            } else if (parameter[0].equalsIgnoreCase("broker")) {
+                                Settings.MQTT.Broker(parameter[1]);
+                            } else if (parameter[0].equalsIgnoreCase("port")) {
+                                Settings.MQTT.Port(parameter[1].toInt());
+                            } else if (parameter[0].equalsIgnoreCase("user")) {
+                                Settings.MQTT.User(parameter[1]);
+                            } else if (parameter[0].equalsIgnoreCase("password")) {
+                                Settings.MQTT.Password(parameter[1]);
+                            }
+
+                            Settings.Save();
+                        }
+
+                        String result;
+                        result += "MQTT         | Enabled: " + String(Settings.MQTT.Enabled() ? "Yes" : "No") + "\r\n";
+                        result += "             | Broker: " + Settings.MQTT.Broker() + "\r\n";
+                        result += "             | Port: " + String(Settings.MQTT.Port()) + "\r\n";
+                        result += "             | User: " + Settings.MQTT.User() + "\r\n";
+                        result += "             | Password: " + Settings.MQTT.Password() + "\r\n";
+                        client->write(result.c_str());
+                    }, true);
+
                     devTelnetServer->onCommand("datetime", "Show current date and time\r\n\r\ndatetime", [&](AsyncClient* client, String* parameter) {
                         client->write(String(devClock->CurrentDateTime() + "\r\n").c_str());
                     });
@@ -349,6 +508,7 @@ void setup() {
                 } else {
                     devLog->Write("Date and Time: Using local settings", LOGLEVEL_INFO);
                 }
+                
 
                 // Orchestrator
                 // Orchestrator.Begin();
@@ -363,260 +523,260 @@ void setup() {
                 // }
 
                 // WebServer/MQTT
-                // if (!interfacesRegistered) {
-                //     devWebServer = new AsyncWebServer(Settings.WebServer.Port());
+                if (!interfacesRegistered) {
+                    // WebServer
+                    if (Settings.WebServer.Enabled()) {
+                        devWebServer = new AsyncWebServer(Settings.WebServer.Port());
                     
-                //     devWebServer->onNotFound([](AsyncWebServerRequest *request) { request->send(404); });
-                //     devWebServer->on("/res/css/styles.css", HTTP_GET, [&](AsyncWebServerRequest *request) { Web_Content("/res/css/styles.css", "text/css", request, false, true); });
-                //     devWebServer->on("/res/img/logo.png", HTTP_GET, [&](AsyncWebServerRequest *request) { Web_Content("/res/img/logo.png", "image/png", request, false, true); });
-                //     devWebServer->on("/res/img/logo-min.png", HTTP_GET, [&](AsyncWebServerRequest *request) { Web_Content("/res/img/logo-min.png", "image/png", request, false, true); });
-                //     devWebServer->on("/login.html", HTTP_GET, [&](AsyncWebServerRequest *request) { Web_Content("/login.html", "text/html", request, false); });
+                        devWebServer->onNotFound([](AsyncWebServerRequest *request) { request->send(404); });
+                        devWebServer->on("/res/css/styles.css", HTTP_GET, [&](AsyncWebServerRequest *request) { Web_Content("/res/css/styles.css", "text/css", request, false, true); });
+                        devWebServer->on("/res/img/logo.png", HTTP_GET, [&](AsyncWebServerRequest *request) { Web_Content("/res/img/logo.png", "image/png", request, false, true); });
+                        devWebServer->on("/res/img/logo-min.png", HTTP_GET, [&](AsyncWebServerRequest *request) { Web_Content("/res/img/logo-min.png", "image/png", request, false, true); });
+                        devWebServer->on("/login.html", HTTP_GET, [&](AsyncWebServerRequest *request) { Web_Content("/login.html", "text/html", request, false); });
 
-                //     devWebServer->on("/login.cgi", HTTP_POST, [&](AsyncWebServerRequest *request) {
-                //         if (request->hasArg("username") && request->hasArg("password")) {
-                //             if (Settings.Users.Authenticate(request->arg("username"), request->arg("password")) == UserError::OK) {
-                //                 AsyncWebServerResponse *response = request->beginResponse(301);  // Sends 301 redirect
+                        devWebServer->on("/login.cgi", HTTP_POST, [&](AsyncWebServerRequest *request) {
+                            if (request->hasArg("username") && request->hasArg("password")) {
+                                if (Settings.Users.Authenticate(request->arg("username"), request->arg("password")) == UserReturn::Authenticated) {
+                                    AsyncWebServerResponse *response = request->beginResponse(301);  // Sends 301 redirect
 
-                //                 response->addHeader("Location", "/");
-                //                 response->addHeader("Cache-Control", "no-cache");
+                                    response->addHeader("Location", "/");
+                                    response->addHeader("Cache-Control", "no-cache");
 
-                //                 String token = String(request->arg("username") + ":" + request->arg("password") + ":" + request->client()->remoteIP().toString());
-                //                 response->addHeader("Set-Cookie", "ESPSESSIONID=" + token);
+                                    String token = String(request->arg("username") + ":" + request->arg("password") + ":" + request->client()->remoteIP().toString());
+                                    response->addHeader("Set-Cookie", "ESPSESSIONID=" + token);
 
-                //                 request->send(response);
+                                    request->send(response);
 
-                //                 devLog->Write("HTTP logon successful for '" + request->arg("username") + "@" + request->client()->remoteIP().toString() + "'", LOGLEVEL_INFO);
-                //                 return;
-                //             } else {
-                //                 devLog->Write("HTTP login failed for '" + request->arg("username") + "@" + request->client()->remoteIP().toString() + "'", LOGLEVEL_ERROR);
-                //                 String msg = "{\"title\":\"Error\",\"message\":\"You do not have permissions to access this device\"}";
-                //                 String encodedMsg = urlEncode(msg);
+                                    devLog->Write("HTTP logon successful for '" + request->arg("username") + "@" + request->client()->remoteIP().toString() + "'", LOGLEVEL_INFO);
+                                    return;
+                                } else {
+                                    devLog->Write("HTTP login failed for '" + request->arg("username") + "@" + request->client()->remoteIP().toString() + "'", LOGLEVEL_ERROR);
+                                    String msg = "{\"title\":\"Error\",\"message\":\"You do not have permissions to access this device\"}";
+                                    String encodedMsg = urlEncode(msg);
 
-                //                 AsyncWebServerResponse *response = request->beginResponse(301);
-                //                 response->addHeader("Location", "/login.html");
-                //                 response->addHeader("Cache-Control", "no-cache");
-                //                 response->addHeader("Set-Cookie", "LOGIN_MSG=" + encodedMsg + "; Max-Age=5; Path=/");
-                //                 request->send(response);
-                //                 return;
-                //             }
-                //         }
-                //     });
+                                    AsyncWebServerResponse *response = request->beginResponse(301);
+                                    response->addHeader("Location", "/login.html");
+                                    response->addHeader("Cache-Control", "no-cache");
+                                    response->addHeader("Set-Cookie", "LOGIN_MSG=" + encodedMsg + "; Max-Age=5; Path=/");
+                                    request->send(response);
+                                    return;
+                                }
+                            }
+                        });
 
-                //     // WebServer
-                //     if (Settings.WebServer.Enabled()) {
-                //         for (auto m : Settings.Components) {
-                //             switch (m->Class()) {
+                        for (auto m : Settings.Components) {
+                            switch (m->Class()) {
 
-                //                 case CLASS_RELAY: {
-                //                     devWebServer->on(String("/" + m->Name()).c_str(), HTTP_GET, [=](AsyncWebServerRequest *request) {
-                //                         JsonDocument reply;
-                //                         String json;
+                                case CLASS_RELAY: {
+                                    devWebServer->on(String("/" + m->Name()).c_str(), HTTP_GET, [=](AsyncWebServerRequest *request) {
+                                        JsonDocument reply;
+                                        String json;
 
-                //                         if (hasValidHeaderToken(request, Settings.WebServer.WebHooksToken())) {
-                //                             bool setnewvalue = false;
-                //                             String Arg, Val;
+                                        if (hasValidHeaderToken(request, Settings.WebServer.WebHooksToken())) {
+                                            bool setnewvalue = false;
+                                            String Arg, Val;
 
-                //                             if (request->args() > 0) {
-                //                                 for (uint8_t i = 0; i < (uint8_t)request->args(); i++) {
-                //                                     Arg = request->argName(i);
-                //                                     Val = request->arg(i);
+                                            if (request->args() > 0) {
+                                                for (uint8_t i = 0; i < (uint8_t)request->args(); i++) {
+                                                    Arg = request->argName(i);
+                                                    Val = request->arg(i);
 
-                //                                     if (Arg.equalsIgnoreCase("state")) {
-                //                                         if (Val == "on" || Val == "true" || Val == "1") {
-                //                                             m->as<Relay>()->State(true);
-                //                                             setnewvalue = true;
-                //                                         } else if (Val == "off" || Val == "false" || Val == "0") {
-                //                                             m->as<Relay>()->State(false);
-                //                                             setnewvalue = true;
-                //                                         } else if (Val == "toggle" || Val == "invert" || Val == "~") {
-                //                                             m->as<Relay>()->Invert();
-                //                                             setnewvalue = true;
-                //                                         }
-                //                                     }
-                //                                 }
-                //                             }
+                                                    if (Arg.equalsIgnoreCase("state")) {
+                                                        if (Val == "on" || Val == "true" || Val == "1") {
+                                                            m->as<Relay>()->State(true);
+                                                            setnewvalue = true;
+                                                        } else if (Val == "off" || Val == "false" || Val == "0") {
+                                                            m->as<Relay>()->State(false);
+                                                            setnewvalue = true;
+                                                        } else if (Val == "toggle" || Val == "invert" || Val == "~") {
+                                                            m->as<Relay>()->Invert();
+                                                            setnewvalue = true;
+                                                        }
+                                                    }
+                                                }
+                                            }
 
-                //                             reply["Class"] = "Relay";
-                //                             reply["State"] = m->as<Relay>()->State();
-                //                             reply["Name"] = m->Name();
+                                            reply["Class"] = "Relay";
+                                            reply["State"] = m->as<Relay>()->State();
+                                            reply["Name"] = m->Name();
 
-                //                             serializeJson(reply, json);
+                                            serializeJson(reply, json);
 
-                //                             request->send(200, "application/json", json.c_str());
+                                            request->send(200, "application/json", json.c_str());
 
-                //                             devLog->Write("Granted HTTP request " + String(setnewvalue ? "(SET '" + Arg + "=" + Val + "')"  : "(GET)") + " from " + request->client()->remoteIP().toString() + " to /" + m->Name(), LOGLEVEL_INFO);
-                //                         } else {
-                //                             reply["Error"] = "Unauthorized";
-                //                             serializeJson(reply, json);
+                                            devLog->Write("Granted HTTP request " + String(setnewvalue ? "(SET '" + Arg + "=" + Val + "')"  : "(GET)") + " from " + request->client()->remoteIP().toString() + " to /" + m->Name(), LOGLEVEL_INFO);
+                                        } else {
+                                            reply["Error"] = "Unauthorized";
+                                            serializeJson(reply, json);
 
-                //                             request->send(401, "application/json", json.c_str());
-                //                             devLog->Write("Unauthorized HTTP request from " + request->client()->remoteIP().toString() + " to /" + m->Name(), LOGLEVEL_WARNING);
-                //                         }
-                //                     });
-                //                 } break;
+                                            request->send(401, "application/json", json.c_str());
+                                            devLog->Write("Unauthorized HTTP request from " + request->client()->remoteIP().toString() + " to /" + m->Name(), LOGLEVEL_WARNING);
+                                        }
+                                    });
+                                } break;
 
-                //                 case CLASS_PIR : {
-                //                     registerEndpoint(devWebServer, m, "PIR", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
-                //                         reply["Motion"] = comp->as<PIR>()->State();
-                //                     }, Settings.WebServer.WebHooksToken(), devLog);
-                //                 } break;
+                                case CLASS_PIR : {
+                                    registerEndpoint(devWebServer, m, "PIR", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
+                                        reply["Motion"] = comp->as<PIR>()->State();
+                                    }, Settings.WebServer.WebHooksToken(), devLog);
+                                } break;
 
-                //                 case CLASS_BUTTON: {
-                //                     registerEndpoint(devWebServer, m, "Button", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
-                //                         reply["Pressed"] = comp->as<Button>()->IsPressed();
-                //                     }, Settings.WebServer.WebHooksToken(), devLog);
-                //                 } break;
+                                case CLASS_BUTTON: {
+                                    registerEndpoint(devWebServer, m, "Button", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
+                                        reply["Pressed"] = comp->as<Button>()->IsPressed();
+                                    }, Settings.WebServer.WebHooksToken(), devLog);
+                                } break;
 
-                //                 case CLASS_CURRENTMETER: {
-                //                     registerEndpoint(devWebServer, m, "Currentmeter", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
-                //                         reply["Current AC"] = comp->as<Currentmeter>()->CurrentAC();
-                //                         reply["Current DC"] = comp->as<Currentmeter>()->CurrentDC();
-                //                     }, Settings.WebServer.WebHooksToken(), devLog);
-                //                 } break;
+                                case CLASS_CURRENTMETER: {
+                                    registerEndpoint(devWebServer, m, "Currentmeter", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
+                                        reply["Current AC"] = comp->as<Currentmeter>()->CurrentAC();
+                                        reply["Current DC"] = comp->as<Currentmeter>()->CurrentDC();
+                                    }, Settings.WebServer.WebHooksToken(), devLog);
+                                } break;
 
-                //                 case CLASS_THERMOMETER: {
-                //                     registerEndpoint(devWebServer, m, "Thermometer", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
-                //                         reply["Humidity"] = comp->as<Thermometer>()->Humidity();
-                //                         reply["Temperature"] = comp->as<Thermometer>()->Temperature();
-                //                     }, Settings.WebServer.WebHooksToken(), devLog);
-                //                 } break;
+                                case CLASS_THERMOMETER: {
+                                    registerEndpoint(devWebServer, m, "Thermometer", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
+                                        reply["Humidity"] = comp->as<Thermometer>()->Humidity();
+                                        reply["Temperature"] = comp->as<Thermometer>()->Temperature();
+                                    }, Settings.WebServer.WebHooksToken(), devLog);
+                                } break;
 
-                //                 case CLASS_BLINDS: {
-                //                     registerEndpoint(devWebServer, m, "Blinds", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
-                //                         reply["Position"] = comp->as<Blinds>()->Position();
-                //                         reply["State"] = comp->as<Blinds>()->State() == BlindsStates::BLINDSSTATE_DECREASING ? "Decreasing" : (comp->as<Blinds>()->State() == BlindsStates::BLINDSSTATE_INCREASING ? "Increasing" : "Stopped");
-                //                     }, Settings.WebServer.WebHooksToken(), devLog);
-                //                 } break;
+                                case CLASS_BLINDS: {
+                                    registerEndpoint(devWebServer, m, "Blinds", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
+                                        reply["Position"] = comp->as<Blinds>()->Position();
+                                        reply["State"] = comp->as<Blinds>()->State() == BlindsStates::BLINDSSTATE_DECREASING ? "Decreasing" : (comp->as<Blinds>()->State() == BlindsStates::BLINDSSTATE_INCREASING ? "Increasing" : "Stopped");
+                                    }, Settings.WebServer.WebHooksToken(), devLog);
+                                } break;
 
-                //                 case CLASS_DOORBELL: {
-                //                     registerEndpoint(devWebServer, m, "Doorbell", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
-                //                         reply["State"] = comp->as<Doorbell>()->State();
-                //                     }, Settings.WebServer.WebHooksToken(), devLog);
-                //                 } break;
+                                case CLASS_DOORBELL: {
+                                    registerEndpoint(devWebServer, m, "Doorbell", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
+                                        reply["State"] = comp->as<Doorbell>()->State();
+                                    }, Settings.WebServer.WebHooksToken(), devLog);
+                                } break;
 
-                //                 case CLASS_CONTACTSENSOR: {
-                //                     registerEndpoint(devWebServer, m, "ContactSensor", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
-                //                         reply["State"] = comp->as<ContactSensor>()->State();
-                //                     }, Settings.WebServer.WebHooksToken(), devLog);
-                //                 } break;
-                //             }
-                //         }
+                                case CLASS_CONTACTSENSOR: {
+                                    registerEndpoint(devWebServer, m, "ContactSensor", [](JsonDocument& reply, DeviceIQ_Components::Generic* comp) {
+                                        reply["State"] = comp->as<ContactSensor>()->State();
+                                    }, Settings.WebServer.WebHooksToken(), devLog);
+                                } break;
+                            }
+                        }
 
-                //         devWebServer->begin();
-                //         devLog->Write("Web Server: Enabled on port " + String(Settings.WebServer.Port()), LOGLEVEL_INFO);
-                //     } else {
-                //         devLog->Write("Web Server: Disabled", LOGLEVEL_INFO);
-                //     }
+                        devWebServer->begin();
+                        devLog->Write("Web Server: Enabled on port " + String(Settings.WebServer.Port()), LOGLEVEL_INFO);
+                    } else {
+                        devLog->Write("Web Server: Disabled", LOGLEVEL_INFO);
+                    }
 
-                //     // MQTT
-                //     if (Settings.MQTT.Enabled()) {
-                //         devMQTT->Broker(Settings.MQTT.Broker());
-                //         devMQTT->Port(Settings.MQTT.Port());
-                //         devMQTT->User(Settings.MQTT.User());
-                //         devMQTT->Password(Settings.MQTT.Password());
+                    // MQTT
+                    if (Settings.MQTT.Enabled()) {
+                        devMQTT->Broker(Settings.MQTT.Broker());
+                        devMQTT->Port(Settings.MQTT.Port());
+                        devMQTT->User(Settings.MQTT.User());
+                        devMQTT->Password(Settings.MQTT.Password());
 
-                //         devMQTT->Subscribe(devNetwork->Hostname() + "/Set/#", [&](const String& topic, const String& payload) {
-                //             const String prefixSet = devNetwork->Hostname() + "/Set/";
+                        devMQTT->Subscribe(devNetwork->Hostname() + "/Set/#", [&](const String& topic, const String& payload) {
+                            const String prefixSet = devNetwork->Hostname() + "/Set/";
 
-                //             if (topic.startsWith(prefixSet) == true) {
-                //                 String tmpClass, tmpName, tmpPayload;
+                            if (topic.startsWith(prefixSet) == true) {
+                                String tmpClass, tmpName, tmpPayload;
 
-                //                 String rest = topic.substring(prefixSet.length());
-                //                 int slash = rest.indexOf('/');
-                //                 if (slash >= 0) rest = rest.substring(0, slash);
+                                String rest = topic.substring(prefixSet.length());
+                                int slash = rest.indexOf('/');
+                                if (slash >= 0) rest = rest.substring(0, slash);
 
-                //                 int colon = rest.indexOf(':');
-                //                 if (colon <= 0 || colon == rest.length()-1) { 
-                //                     devLog->Write("MQTT: Data received does not have expected structure", LOGLEVEL_WARNING);
-                //                     return;
-                //                 }
+                                int colon = rest.indexOf(':');
+                                if (colon <= 0 || colon == rest.length()-1) { 
+                                    devLog->Write("MQTT: Data received does not have expected structure", LOGLEVEL_WARNING);
+                                    return;
+                                }
 
-                //                 tmpClass = rest.substring(0, colon);
-                //                 tmpName  = rest.substring(colon + 1);
-                //                 tmpPayload = payload;
+                                tmpClass = rest.substring(0, colon);
+                                tmpName  = rest.substring(colon + 1);
+                                tmpPayload = payload;
                                 
-                //                 tmpClass.trim();
-                //                 tmpName.trim();
-                //                 tmpPayload.trim();
+                                tmpClass.trim();
+                                tmpName.trim();
+                                tmpPayload.trim();
 
-                //                 tmpPayload.toLowerCase();
+                                tmpPayload.toLowerCase();
 
-                //                 auto comp =  Settings.Components[tmpName];
+                                auto comp =  Settings.Components[tmpName];
 
-                //                 if (!comp) {
-                //                     devLog->Write("MQTT: Target not found [" + tmpClass + ":" + tmpName + "]", LOGLEVEL_WARNING);
-                //                 } else {
-                //                     switch (comp->Class()) {
+                                if (!comp) {
+                                    devLog->Write("MQTT: Target not found [" + tmpClass + ":" + tmpName + "]", LOGLEVEL_WARNING);
+                                } else {
+                                    switch (comp->Class()) {
 
-                //                         case CLASS_RELAY: {
-                //                             if (!tmpClass.equalsIgnoreCase("relay")) {
-                //                                 devLog->Write("MQTT: Class mismatch - topic says [" + tmpClass + "], actual is Relay:" + tmpName, LOGLEVEL_WARNING);
-                //                             } else {
-                //                                 if (tmpPayload == "on" || tmpPayload == "true" || tmpPayload == "1")
-                //                                     comp->as<Relay>()->State(true);
-                //                                 else if (tmpPayload == "off" || tmpPayload == "false" || tmpPayload == "0")
-                //                                     comp->as<Relay>()->State(false);
-                //                                 else if (tmpPayload == "toggle" || tmpPayload == "invert" || tmpPayload == "~")
-                //                                     comp->as<Relay>()->Invert();
-                //                             }
-                //                         } break;
+                                        case CLASS_RELAY: {
+                                            if (!tmpClass.equalsIgnoreCase("relay")) {
+                                                devLog->Write("MQTT: Class mismatch - topic says [" + tmpClass + "], actual is Relay:" + tmpName, LOGLEVEL_WARNING);
+                                            } else {
+                                                if (tmpPayload == "on" || tmpPayload == "true" || tmpPayload == "1")
+                                                    comp->as<Relay>()->State(true);
+                                                else if (tmpPayload == "off" || tmpPayload == "false" || tmpPayload == "0")
+                                                    comp->as<Relay>()->State(false);
+                                                else if (tmpPayload == "toggle" || tmpPayload == "invert" || tmpPayload == "~")
+                                                    comp->as<Relay>()->Invert();
+                                            }
+                                        } break;
 
-                //                         case CLASS_BLINDS: {
-                //                             if (!tmpClass.equalsIgnoreCase("blinds")) {
-                //                                 devLog->Write("MQTT: Class mismatch - topic says [" + tmpClass + "], actual is Blinds:" + tmpName, LOGLEVEL_WARNING);
-                //                             } else { 
-                //                                 // handleBlinds(comp, data);
-                //                             }
-                //                         } break;
+                                        case CLASS_BLINDS: {
+                                            if (!tmpClass.equalsIgnoreCase("blinds")) {
+                                                devLog->Write("MQTT: Class mismatch - topic says [" + tmpClass + "], actual is Blinds:" + tmpName, LOGLEVEL_WARNING);
+                                            } else { 
+                                                // handleBlinds(comp, data);
+                                            }
+                                        } break;
 
-                //                         case CLASS_BUTTON: {
-                //                             if (!tmpClass.equalsIgnoreCase("button")) {
-                //                                 devLog->Write("MQTT: Class mismatch - topic says [" + tmpClass + "], actual is Button:" + tmpName, LOGLEVEL_WARNING);
-                //                             } else { 
-                //                                 // handleButton(comp, data);
-                //                             }
-                //                         } break;
+                                        case CLASS_BUTTON: {
+                                            if (!tmpClass.equalsIgnoreCase("button")) {
+                                                devLog->Write("MQTT: Class mismatch - topic says [" + tmpClass + "], actual is Button:" + tmpName, LOGLEVEL_WARNING);
+                                            } else { 
+                                                // handleButton(comp, data);
+                                            }
+                                        } break;
 
-                //                         case CLASS_THERMOMETER: {
-                //                             if (!tmpClass.equalsIgnoreCase("thermometer")) {
-                //                                 devLog->Write("MQTT: Class mismatch - topic says [" + tmpClass + "], actual is Thermometer:" + tmpName, LOGLEVEL_WARNING);
-                //                             } else { 
-                //                                 // handleThermometer(comp, data);
-                //                             }
-                //                         } break;
+                                        case CLASS_THERMOMETER: {
+                                            if (!tmpClass.equalsIgnoreCase("thermometer")) {
+                                                devLog->Write("MQTT: Class mismatch - topic says [" + tmpClass + "], actual is Thermometer:" + tmpName, LOGLEVEL_WARNING);
+                                            } else { 
+                                                // handleThermometer(comp, data);
+                                            }
+                                        } break;
 
-                //                         case CLASS_CURRENTMETER: {
-                //                             if (!tmpClass.equalsIgnoreCase("currentmeter")) {
-                //                                 devLog->Write("MQTT: Class mismatch - topic says [" + tmpClass + "], actual is Currentmeter:" + tmpName, LOGLEVEL_WARNING);
-                //                             } else { 
-                //                                 // handleCurrentmeter(comp, data);
-                //                             }
-                //                         } break;
+                                        case CLASS_CURRENTMETER: {
+                                            if (!tmpClass.equalsIgnoreCase("currentmeter")) {
+                                                devLog->Write("MQTT: Class mismatch - topic says [" + tmpClass + "], actual is Currentmeter:" + tmpName, LOGLEVEL_WARNING);
+                                            } else { 
+                                                // handleCurrentmeter(comp, data);
+                                            }
+                                        } break;
 
-                //                         default: {
-                //                             devLog->Write("MQTT: Unsupported class on " + tmpName, LOGLEVEL_WARNING);
-                //                         } break;
-                //                     }
-                //                 }
-                //             } else {
-                //                 devLog->Write("MQTT data received does not have expected structure", LOGLEVEL_WARNING);
-                //             }
-                //         });
+                                        default: {
+                                            devLog->Write("MQTT: Unsupported class on " + tmpName, LOGLEVEL_WARNING);
+                                        } break;
+                                    }
+                                }
+                            } else {
+                                devLog->Write("MQTT data received does not have expected structure", LOGLEVEL_WARNING);
+                            }
+                        });
 
-                //         if (devMQTT->Connect()) {
-                //             devLog->Write("MQTT: Connected", LOGLEVEL_INFO);
-                //         } else {
-                //             devLog->Write("MQTT: Not connected", LOGLEVEL_INFO);
-                //         }
-                //     } else {
-                //         devLog->Write("MQTT: Disabled", LOGLEVEL_INFO);
-                //     }
+                        if (devMQTT->Connect()) {
+                            devLog->Write("MQTT: Connected on " + Settings.MQTT.User() + "@" + Settings.MQTT.Broker() + ":" +String(Settings.MQTT.Port()) , LOGLEVEL_INFO);
+                        } else {
+                            devLog->Write("MQTT: Unable to connected to " + Settings.MQTT.User() + "@" + Settings.MQTT.Broker() + ":" +String(Settings.MQTT.Port()) , LOGLEVEL_ERROR);
+                        }
+                    } else {
+                        devLog->Write("MQTT: Disabled", LOGLEVEL_INFO);
+                    }
 
-                //     // Refresh all components, sending initial state to MQTT
-                //     for (auto m : Settings.Components) { m->Refresh(); }
+                    // Refresh all components, sending initial state to MQTT
+                    for (auto m : Settings.Components) { m->Refresh(); }
 
-                //     interfacesRegistered = true;
-                // }
+                    interfacesRegistered = true;
+                }
             } break;
             case SoftAP: {
                 devLog->Write("Network: " + devNetwork->Hostname() + " MAC " + devNetwork->MAC_Address() + " connected to " + devNetwork->SSID() + " (AP Mode) IP " + devNetwork->IP_Address().toString(), LOGLEVEL_INFO);
@@ -657,7 +817,7 @@ void loop() {
     devNetwork->Control();
 
     if (devNetwork->ConnectionMode() == APMode::WifiClient ) {
-        // devMQTT->Control();
+        devMQTT->Control();
 
         // if (devUpdateClient) {
         //     devUpdateClient->Control();
