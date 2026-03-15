@@ -227,8 +227,7 @@ void setup() {
                         uint32_t flashSketchSize = ESP.getSketchSize();
                         uint32_t flashFreeSketch = ESP.getFreeSketchSpace();
 
-                        size_t fsTotal = 0;
-                        size_t fsUsed  = 0;
+                        size_t fsTotal = 0, fsUsed  = 0;
 
                         if (LittleFS.begin(true)) {
                             fsTotal = LittleFS.totalBytes();
@@ -485,6 +484,47 @@ void setup() {
                         result += "             | Port: " + String(Settings.MQTT.Port()) + "\r\n";
                         result += "             | User: " + Settings.MQTT.User() + "\r\n";
                         result += "             | Password: " + Settings.MQTT.Password() + "\r\n";
+                        client->write(result.c_str());
+                    }, true);
+
+                    devTelnetServer->onCommand("webserver", "Show or change WebServer configuration\r\n\r\nwebserver [options]", [&](AsyncClient* client, String* parameter) {
+                        if (!parameter[0].isEmpty()) {
+                            if (parameter[0].equalsIgnoreCase("enable")) {
+                                Settings.WebServer.Enabled(true);
+                            } else if (parameter[0].equalsIgnoreCase("disable")) {
+                                Settings.WebServer.Enabled(false);
+                            } else if (parameter[0].equalsIgnoreCase("port")) {
+                                Settings.WebServer.Port(parameter[1].toInt());
+                            } else if (parameter[0].equalsIgnoreCase("token")) {
+                                Settings.WebServer.WebHooksToken(parameter[1]);
+                            }
+
+                            Settings.Save();
+                        }
+
+                        String result;
+                        result += "Web Server   | Enabled: " + String(Settings.WebServer.Enabled() ? "Yes" : "No") + "\r\n";
+                        result += "             | Port: " + String(Settings.WebServer.Port()) + "\r\n";
+                        result += "             | Token: " + Settings.WebServer.WebHooksToken() + "\r\n";
+                        client->write(result.c_str());
+                    }, true);
+
+                    devTelnetServer->onCommand("telnet", "Show or change Telnet configuration\r\n\r\ntelnet [options]", [&](AsyncClient* client, String* parameter) {
+                        if (!parameter[0].isEmpty()) {
+                            if (parameter[0].equalsIgnoreCase("enable")) {
+                                Settings.TelnetServer.Enabled(true);
+                            } else if (parameter[0].equalsIgnoreCase("disable")) {
+                                Settings.TelnetServer.Enabled(false);
+                            } else if (parameter[0].equalsIgnoreCase("port")) {
+                                Settings.TelnetServer.Port(parameter[1].toInt());
+                            }
+
+                            Settings.Save();
+                        }
+
+                        String result;
+                        result += "Telnet       | Enabled: " + String(Settings.TelnetServer.Enabled() ? "Yes" : "No") + "\r\n";
+                        result += "             | Port: " + String(Settings.TelnetServer.Port()) + "\r\n";
                         client->write(result.c_str());
                     }, true);
 
@@ -813,7 +853,7 @@ void setup() {
 void loop() {
     // static bool s_updating = false;
 
-    devClock->Control();    
+    devClock->Control();
     devNetwork->Control();
 
     if (devNetwork->ConnectionMode() == APMode::WifiClient ) {

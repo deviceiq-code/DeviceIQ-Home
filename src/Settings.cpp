@@ -669,9 +669,9 @@ bool settings_t::Load(const String& configfilename) noexcept {
         Orchestrator.Port((uint16_t)(orch["Port"] | Defaults.Orchestrator.Port));
     }
 
-    // WebHooks
-    if (root["WebHooks"].is<JsonObjectConst>()) {
-        JsonObjectConst wh = root["WebHooks"].as<JsonObjectConst>();
+    // Web Server
+    if (root["Web Server"].is<JsonObjectConst>()) {
+        JsonObjectConst wh = root["Web Server"].as<JsonObjectConst>();
         WebServer.Port((uint16_t)(wh["Port"] | Defaults.WebServer.Port));
         WebServer.Enabled((bool)(wh["Enabled"] | Defaults.WebServer.Enabled));
         WebServer.WebHooksToken(String(wh["Token"] | Defaults.WebServer.WebHooksToken));
@@ -687,6 +687,13 @@ bool settings_t::Load(const String& configfilename) noexcept {
         MQTT.Port((uint16_t)(mq["Port"] | Defaults.MQTT.Port));
         MQTT.User(String(mq["User"] | Defaults.MQTT.User));
         MQTT.Password(String(mq["Password"] | Defaults.MQTT.Password));
+    }
+
+    // Telnet
+    if (root["Telnet"].is<JsonObjectConst>()) {
+        JsonObjectConst tn = root["Telnet"].as<JsonObjectConst>();
+        TelnetServer.Enabled((bool)(tn["Enabled"] | Defaults.TelnetServer.Enabled));
+        TelnetServer.Port((uint16_t)(tn["Port"] | Defaults.TelnetServer.Port));
     }
 
     return true;
@@ -1122,12 +1129,12 @@ bool settings_t::Save(const String& configfilename) const noexcept {
         orch["Port"] = Orchestrator.Port();
     }
 
-    // WebHooks
+    // Web Server
     {
         JsonObject wh = doc["Web Server"].to<JsonObject>();
         wh["Port"] = WebServer.Port();
         wh["Enabled"] = WebServer.Enabled();
-        wh["WebHooks Token"] = WebServer.WebHooksToken();
+        wh["Token"] = WebServer.WebHooksToken();
     }
 
     // MQTT
@@ -1138,6 +1145,13 @@ bool settings_t::Save(const String& configfilename) const noexcept {
         mq["Port"] = MQTT.Port();
         mq["User"] = MQTT.User();
         mq["Password"] = MQTT.Password();
+    }
+
+    // Telnet
+    {
+        JsonObject tn = doc["Telnet"].to<JsonObject>();
+        tn["Enabled"] = TelnetServer.Enabled();
+        tn["Port"] = TelnetServer.Port();
     }
 
     if (existingDoc["Components"].is<JsonArrayConst>()) {
