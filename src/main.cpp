@@ -291,6 +291,48 @@ void setup() {
                         DeviceRestart();
                     }, true);
 
+                    devTelnetServer->onCommand("network", "Show or change network configuration\r\n\r\nnet [options]", [&](AsyncClient* client, String* parameter) {
+                        if (parameter[0].isEmpty()) {
+                            String result;
+                            result += "Network      | SSID: " + devNetwork->SSID() + "\r\n";
+                            result += "             | Hostname: " + devNetwork->Hostname() + "\r\n";
+                            result += "             | DHCP: " + String(devNetwork->DHCP_Client() ? "Yes" : "No") + "\r\n";
+                            result += "             | IP: " + devNetwork->IP_Address().toString() + "\r\n";
+                            result += "             | Netmask: " + devNetwork->Netmask().toString() + "\r\n";
+                            result += "             | Gateway: " + devNetwork->Gateway().toString() + "\r\n\r\n";
+                            
+                            result += "DNS          | Primary: " + devNetwork->DNS_Server(0).toString() + "\r\n";
+                            result += "             | Primary: " + devNetwork->DNS_Server(1).toString() + "\r\n";
+                            
+                            client->write(result.c_str());
+                        } else {
+
+                        }
+                    }, true);
+
+                    devTelnetServer->onCommand("ntp", "Show or change NTP configuration\r\n\r\nntp [options]", [&](AsyncClient* client, String* parameter) {
+                        if (!parameter[0].isEmpty()) {
+                            if (parameter[0].equalsIgnoreCase("enable")) {
+                                Settings.General.NTPUpdate(true);
+                            } else if (parameter[0].equalsIgnoreCase("disable")) {
+                                Settings.General.NTPUpdate(false);
+                            } else {
+                                Settings.General.NTPServer(parameter[0]);
+                            }
+
+                            Settings.Save();
+                        }
+
+                        String result;
+                        result += "NTP          | Enabled: " + String(Settings.General.NTPUpdate() ? "Yes" : "No") + "\r\n";
+                        result += "             | Server: " + Settings.General.NTPServer() + "\r\n";
+                        client->write(result.c_str());
+                    }, true);
+
+                    devTelnetServer->onCommand("datetime", "Show current date and time\r\n\r\ndatetime", [&](AsyncClient* client, String* parameter) {
+                        client->write(String(devClock->CurrentDateTime() + "\r\n").c_str());
+                    });
+
                     devTelnetServer->begin();
                     devLog->Write("Telnet Server: Enabled on port " + String(Settings.TelnetServer.Port()), LOGLEVEL_INFO);
                 } else {
@@ -298,15 +340,15 @@ void setup() {
                 }
 
                 // NTP
-                // if (Settings.General.NTPUpdate()) {
-                //     if (devClock->NTPUpdate(Settings.General.NTPServer())) {
-                //         devLog->Write("Date and Time: Updated from NTP server " + Settings.General.NTPServer(), LOGLEVEL_INFO);
-                //     } else {
-                //         devLog->Write("Date and Time: Failed to update from NTP server " + Settings.General.NTPServer(), LOGLEVEL_ERROR);
-                //     }
-                // } else {
-                //     devLog->Write("Date and Time: Using local settings", LOGLEVEL_INFO);
-                // }
+                if (Settings.General.NTPUpdate()) {
+                    if (devClock->NTPUpdate(Settings.General.NTPServer())) {
+                        devLog->Write("Date and Time: Updated from NTP server " + Settings.General.NTPServer(), LOGLEVEL_INFO);
+                    } else {
+                        devLog->Write("Date and Time: Failed to update from NTP server " + Settings.General.NTPServer(), LOGLEVEL_ERROR);
+                    }
+                } else {
+                    devLog->Write("Date and Time: Using local settings", LOGLEVEL_INFO);
+                }
 
                 // Orchestrator
                 // Orchestrator.Begin();
