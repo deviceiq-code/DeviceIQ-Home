@@ -1,0 +1,133 @@
+{
+    "Log": {
+        "Endpoint": 7,
+        "Level": 255,
+        "Syslog Server": "syslog.svr",
+        "Syslog Port": 514
+    },
+    "Network": {
+        "DHCP Client": true,
+        "Hostname": "deviq-lab",
+        "IP Address": "0.0.0.0",
+        "Gateway": "0.0.0.0",
+        "Netmask": "255.255.255.0",
+        "DNS Servers": [
+            "8.8.8.8",
+            "8.8.4.4"
+        ],
+        "SSID": "IOT-2",
+        "Passphrase": "1921682GenesisIOT-2",
+        "Connection Timeout": 30,
+        "Online Checking": true,
+        "Online Checking Timeout": 10
+    },
+    "Update": {
+        "Manifest URL": "https://server.dts-network.com:8081/update.json",
+        "Allow Insecure": false,
+        "Enable LAN OTA": false,
+        "Password LAN OTA": "",
+        "Check Interval": 3600,
+        "Auto Reboot": true,
+        "Debug": false,
+        "Check At Startup": true
+    },
+    "General": {
+        "NTP Update": true,
+        "NTP Server": "pool.ntp.org"
+    },
+    "Orchestrator": {
+        "Assigned": false,
+        "Server ID": "",
+        "IP Address": "",
+        "Port": 30030
+    },
+    "WebHooks": {
+        "Port": 80,
+        "Enabled": true,
+        "Token": "token_test"
+    },
+    "MQTT": {
+        "Enabled": false,
+        "Broker": "",
+        "Port": 1883,
+        "User": "",
+        "Password": ""
+    },
+    "Components": [
+        {
+            "Address": 14,
+            "Bus": "Onboard",
+            "Class": "Relay",
+            "Enabled": true,
+            "Events": {},
+            "Name": "OL1_Relay",
+            "State": false
+        },
+        {
+            "Address": 27,
+            "Bus": "Onboard",
+            "Class": "Relay",
+            "Enabled": true,
+            "Events": {},
+            "Name": "OL2_Relay",
+            "State": false
+        },
+        {
+            "Address": 26,
+            "Bus": "Onboard",
+            "Class": "Thermometer",
+            "Enabled": true,
+            "Events": {},
+            "Name": "Office",
+            "Type": "DS18B20"
+        },
+        {
+            "Address": 25,
+            "Bus": "Onboard",
+            "Class": "Thermometer",
+            "Enabled": true,
+            "Events": {},
+            "Name": "Rack",
+            "Type": "DS18B20"
+        },
+        {
+            "Address": 32,
+            "Bus": "Onboard",
+            "Class": "Relay",
+            "Enabled": true,
+            "Events": {},
+            "Name": "RK2_Relay",
+            "State": false
+        },
+        {
+            "Address": 33,
+            "Bus": "Onboard",
+            "Class": "ContactSensor",
+            "Enabled": true,
+            "Events": {},
+            "Name": "RK1_ContactSensor"
+        },
+        {
+            "Address": 12,
+            "Bus": "Onboard",
+            "Class": "Button",
+            "Enabled": true,
+            "Events": {
+                "Changed": "invert(OL1_Relay)"
+            },
+            "Name": "OL1_Button",
+            "Report": "EdgesOnly"
+        },
+        {
+            "Address": 13,
+            "Bus": "Onboard",
+            "Class": "Button",
+            "Enabled": true,
+            "Events": {
+                "Changed": "invert(OL2_Relay)"
+            },
+            "Name": "OL2_Button",
+            "Report": "EdgesOnly"
+        }
+    ]
+}

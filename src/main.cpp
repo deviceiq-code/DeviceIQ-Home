@@ -156,8 +156,8 @@ void setup() {
     // });
 
     // Components
-    // Settings.InstallComponents();
-    // devLog->Write("Components: " + String(Settings.Components.Count()) + " component(s) installed", LOGLEVEL_INFO);
+    Settings.InstallComponents();
+    devLog->Write("Components: " + String(Settings.Components.Count()) + " component(s) installed", LOGLEVEL_INFO);
 
     // // Components callbacks
     static bool interfacesRegistered = false;
@@ -296,6 +296,21 @@ void setup() {
                     devTelnetServer->onCommand("reboot", "Reboot the device\r\n\r\nreboot", [&](AsyncClient* client, String* parameter) {
                         DeviceRestart();
                     }, true);
+
+                    devTelnetServer->onCommand("cmp", "Manage components\r\n\r\ncmp", [&](AsyncClient* client, String* parameter) {
+                        if (parameter[0].isEmpty()) {
+                            client->write("Missing parameters.\r\n");
+                        } else {
+                            if (parameter[0].equalsIgnoreCase("list")) {
+                                String result;
+                                result += "Components   | Count: " + String(Settings.Components.Count()) + "\r\n";
+                                for (auto m : Settings.Components) {
+                                    result += "             | " + ClassToString(m->Class()) + ": " + m->Name() + "\r\n";
+                                }
+                                client->write(result.c_str());
+                            }
+                        }
+                    });
 
                     devTelnetServer->onCommand("ping", "Ping IP or host\r\n\r\nping [destination] [-n ntimes]", [&](AsyncClient* client, String* parameter) {
                         if (parameter[0].isEmpty()) {
