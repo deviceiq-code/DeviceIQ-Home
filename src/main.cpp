@@ -305,7 +305,7 @@ void setup() {
                                 String result;
                                 result += "Components   | Count: " + String(Settings.Components.Count()) + "\r\n";
                                 for (auto m : Settings.Components) {
-                                    result += "             | " + ClassToString(m->Class()) + ": " + m->Name() + "\r\n";
+                                    result += "             | " + EnumToString(AvailableComponentClasses, m->Class()) + ": " + m->Name() + "\r\n";
                                 }
                                 client->write(result.c_str());
                             }
