@@ -374,53 +374,24 @@ void Telnet::registerCommand_network() {
         bool changed = false;
 
         if (parameter[0].isEmpty()) {
-            char line[128];
-            result += "Show         | Current            | Saved\r\n\r\n";
-            
-            snprintf(line, sizeof(line), "Network      | SSID:      %-16s | %-16s\r\n", devNetwork->SSID().c_str(), Settings.Network.SSID().c_str());
-            result += line;
-
-            snprintf(line, sizeof(line), "             | Hostname:  %-16s | %-16s\r\n", devNetwork->Hostname().c_str(), Settings.Network.Hostname().c_str());
-            result += line;
-
-            snprintf(line, sizeof(line), "             | DHCP:      %-16s | %-16s\r\n", devNetwork->DHCP_Client() ? "Yes" : "No", Settings.Network.DHCPClient() ? "Yes" : "No");
-            result += line;
-
-            snprintf(line, sizeof(line), "             | IP:        %-16s | %-16s\r\n", devNetwork->IP_Address().toString().c_str(), Settings.Network.IP_Address().toString().c_str());
-            result += line;
-        } else if (parameter[0].equalsIgnoreCase("status")) {
-            result += "Show         | Actual status\r\n\r\n";
-            result += "Network      | SSID: " + devNetwork->SSID() + "\r\n";
-            result += "             | Hostname: " + devNetwork->Hostname() + "\r\n";
-            result += "             | DHCP: " + String(devNetwork->DHCP_Client() ? "Yes" : "No") + "\r\n";
-            result += "             | IP: " + devNetwork->IP_Address().toString() + "\r\n";
-            result += "             | Gateway: " + devNetwork->Gateway().toString() + "\r\n";
-            result += "             | Netmask: " + devNetwork->Netmask().toString() + "\r\n\r\n";
-            
-            result += "DNS          | Primary: " + devNetwork->DNS_Server(0).toString() + "\r\n";
-            result += "             | Secondary: " + devNetwork->DNS_Server(1).toString() + "\r\n\r\n";
-
-            result += "MAC          | Address: " + devNetwork->MAC_Address() + "\r\n";
-        } else if(parameter[0].equalsIgnoreCase("settings")) {
-            result += "Show         | Saved settings\r\n\r\n";
-            result += "Network      | SSID: " + Settings.Network.SSID() + "\r\n";
-            result += "             | Hostname: " + Settings.Network.Hostname() + "\r\n";
-            result += "             | DHCP: " + String(Settings.Network.DHCPClient() ? "Yes" : "No") + "\r\n";
-            result += "             | IP: " + Settings.Network.IP_Address().toString() + "\r\n";
-            result += "             | Gateway: " + Settings.Network.Gateway().toString() + "\r\n";
-            result += "             | Netmask: " + Settings.Network.Netmask().toString() + "\r\n\r\n";
-            
-            result += "DNS          | Primary: " + Settings.Network.DNS(0).toString() + "\r\n";
-            result += "             | Secondary: " + Settings.Network.DNS(1).toString() + "\r\n\r\n";
-
-            result += "MAC          | Address: " + devNetwork->MAC_Address() + "\r\n";
+            result += "                          Actual Status                 Saved Settings\r\n\r\n";
+            result += "Network      | SSID:      " + LimitString(devNetwork->SSID(), 30, true) + LimitString(Settings.Network.SSID(), 30, true) + "\r\n";
+            result += "             | Hostname:  " + LimitString(devNetwork->Hostname(), 30, true) + LimitString(Settings.Network.Hostname(), 30, true) + "\r\n";
+            result += "             | DHCP:      " + LimitString(devNetwork->DHCP_Client() ? "Yes" : "No", 30, true) + LimitString(Settings.Network.DHCPClient() ? "Yes" : "No", 30, true) + "\r\n";
+            result += "             | IP:        " + LimitString(devNetwork->IP_Address().toString(), 30, true) + LimitString(Settings.Network.IP_Address().toString(), 30, true) + "\r\n";
+            result += "             | Gateway:   " + LimitString(devNetwork->Gateway().toString(), 30, true) + LimitString(Settings.Network.Gateway().toString(), 30, true) + "\r\n";
+            result += "             | Mask:      " + LimitString(devNetwork->Netmask().toString(), 30, true) + LimitString(Settings.Network.Netmask().toString(), 30, true) + "\r\n\r\n";
+            result += "DNS          | Primary:   " + LimitString(devNetwork->DNS_Server(0).toString(), 30, true) + LimitString(Settings.Network.DNS(0).toString(), 30, true) + "\r\n";
+            result += "             | Secondary: " + LimitString(devNetwork->DNS_Server(1).toString(), 30, true) + LimitString(Settings.Network.DNS(1).toString(), 30, true) + "\r\n\r\n";
+            result += "MAC          | Address:   " + devNetwork->MAC_Address() + "\r\n";
         } else {
+            result += "                          Actual Status                 Saved Settings\r\n\r\n";
             if (parameter[0].equalsIgnoreCase("hostname")) {
                 if (!parameter[1].isEmpty() && !Settings.Network.Hostname().equalsIgnoreCase(parameter[1])) {
                     Settings.Network.Hostname(parameter[1]);
                     changed = true;
                 }
-                result += "Network      | Hostname: " + Settings.Network.Hostname() + "\r\n";
+                result += "Network      | Hostname:  " + LimitString(devNetwork->Hostname(), 30, true) + LimitString(Settings.Network.Hostname(), 30, true) + "\r\n";
             } else if (parameter[0].equalsIgnoreCase("dhcp")) {
                 if (parameter[1].equalsIgnoreCase("enable") || parameter[1].equalsIgnoreCase("true") || parameter[1].equalsIgnoreCase("on") || parameter[1].equalsIgnoreCase("yes")) {
                     if (!Settings.Network.DHCPClient()) {
@@ -434,39 +405,39 @@ void Telnet::registerCommand_network() {
                     }
                 } 
 
-                result += "Network      | DHCP: " + String(Settings.Network.DHCPClient() ? "Yes" : "No") + "\r\n";
+                result += "Network      | DHCP:      " + LimitString(devNetwork->DHCP_Client() ? "Yes" : "No", 30, true) + LimitString(Settings.Network.DHCPClient() ? "Yes" : "No", 30, true) + "\r\n";
             } else if (parameter[0].equalsIgnoreCase("ip")) {
                 if (!parameter[1].isEmpty() && !Settings.Network.IP_Address().toString().equalsIgnoreCase(parameter[1])) {
                     Settings.Network.IP_Address(parameter[1]);
                     changed = true;
                 }
-                result += "Network      | IP: " + Settings.Network.IP_Address().toString() + "\r\n";
+                result += "Network      | IP:        " + LimitString(devNetwork->IP_Address().toString(), 30, true) + LimitString(Settings.Network.IP_Address().toString(), 30, true) + "\r\n";
             } else if (parameter[0].equalsIgnoreCase("gateway")) {
                 if (!parameter[1].isEmpty() && !Settings.Network.Gateway().toString().equalsIgnoreCase(parameter[1])) {
                     Settings.Network.Gateway(parameter[1]);
                     changed = true;
                 }
-                result += "Network      | Gateway: " + Settings.Network.Gateway().toString() + "\r\n";
-            } else if (parameter[0].equalsIgnoreCase("netmask")) {
+                result += "Network      | Gateway:   " + LimitString(devNetwork->Gateway().toString(), 30, true) + LimitString(Settings.Network.Gateway().toString(), 30, true) + "\r\n";
+            } else if (parameter[0].equalsIgnoreCase("mask")) {
                 if (!parameter[1].isEmpty() && !Settings.Network.Netmask().toString().equalsIgnoreCase(parameter[1])) {
                     Settings.Network.Netmask(parameter[1]);
                     changed = true;
                 }
-                result += "Network      | Netmask: " + Settings.Network.Netmask().toString() + "\r\n";
+                result += "Network      | Mask:      " + LimitString(devNetwork->Netmask().toString(), 30, true) + LimitString(Settings.Network.Netmask().toString(), 30, true) + "\r\n";
             } else if (parameter[0].equalsIgnoreCase("dns1")) {
                 if (!parameter[1].isEmpty() && !Settings.Network.DNS(0).toString().equalsIgnoreCase(parameter[1])) {
                     Settings.Network.DNS(0, parameter[1]);
                     changed = true;
                 }
-                result += "DNS          | Primary: " + Settings.Network.DNS(0).toString() + "\r\n";
+                result += "DNS          | Primary:   " + LimitString(devNetwork->DNS_Server(0).toString(), 30, true) + LimitString(Settings.Network.DNS(0).toString(), 30, true) + "\r\n";
             } else if (parameter[0].equalsIgnoreCase("dns2")) {
                 if (!parameter[1].isEmpty() && !Settings.Network.DNS(1).toString().equalsIgnoreCase(parameter[1])) {
                     Settings.Network.DNS(1, parameter[1]);
                     changed = true;
                 }
-                result += "DNS          | Secondary: " + Settings.Network.DNS(1).toString() + "\r\n";
+                result += "DNS          | Secondary: " + LimitString(devNetwork->DNS_Server(1).toString(), 30, true) + LimitString(Settings.Network.DNS(1).toString(), 30, true) + "\r\n";
             } else if (parameter[0].equalsIgnoreCase("mac")) {
-                result += "MAC          | Address: " + devNetwork->MAC_Address() + "\r\n";
+                result += "MAC          | Address:   " + devNetwork->MAC_Address() + "\r\n";
             }  else {
                 result += "Invalid network parameter.\r\n";
             }
