@@ -377,13 +377,15 @@ void Telnet::registerCommand_ping() {
                 ip_addr_t tmpAddr;
                 if (ipaddr_aton(destination.c_str(), &tmpAddr)) isDnsName = false;
 
-                if (isDnsName) result += "Ping         | Destination: " + String(ip) + " - 32 bytes of data.\r\n";
-                else result += "Ping         | Destination: " + destination + " - 32 bytes of data.\r\n";
+                if (isDnsName) result += "Ping         | Destination: " + String(ip) + " - 32 bytes of data.\r\n\r\n";
+                else result += "Ping         | Destination: " + destination + " - 32 bytes of data.\r\n\r\n";
 
                 int sock = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
                 if (sock < 0) {
-                    result += "             | Error: Cannot create socket\r\n";
-                } else {
+                    result += "             | Error: Cannot create socket\r\n\r\n";
+                } else {    
+                    client->write(result.c_str()); result.clear();
+
                     struct timeval timeout;
                     timeout.tv_sec = 1;
                     timeout.tv_usec = 0;
@@ -444,9 +446,9 @@ void Telnet::registerCommand_ping() {
                             char fromIp[16];
                             inet_ntoa_r(from.sin_addr, fromIp, sizeof(fromIp));
 
-                            client->write(String(String(sizeof(packet)) + " bytes from " + String(fromIp) + ": icmp_seq=" + String(i + 1) + " ttl=64 time=" + String(elapsed) + " ms\r\n").c_str());
+                            client->write(String("             | " + String(sizeof(packet)) + " bytes from " + String(fromIp) + ": icmp_seq = " + String(i + 1) + " ttl = 64 time = " + String(elapsed) + " ms\r\n").c_str());
                         } else {
-                            client->write(String("Request timeout for icmp_seq " + String(i + 1) + "\r\n").c_str());
+                            client->write(String("             | Request timeout for icmp_seq " + String(i + 1) + "\r\n").c_str());
                         }
 
                         delay(1000);
@@ -457,13 +459,12 @@ void Telnet::registerCommand_ping() {
                     uint32_t loss = 0;
                     if (sentCount > 0) loss = ((sentCount - recvCount) * 100UL) / sentCount;
 
-                    client->write("\r\n");
-                    client->write(String("--- " + destination + " ping statistics ---\r\n").c_str());
-                    client->write(String(String(sentCount) + " packets transmitted, " + String(recvCount) + " received, " + String(loss) + "% packet loss\r\n").c_str());
+                    result += String("\r\nStatistcs    | Destination: " + destination + "\r\n");
+                    result += String("             | Transmitted: " + String(sentCount) + " packets\r\n             | Received: " + String(recvCount) + " packets\r\n             | Lost: " + String(loss) + "% packet loss\r\n");
 
                     if (recvCount > 0) {
                         uint32_t avgTime = totalTime / recvCount;
-                        client->write(String("rtt min/avg/max = " + String(minTime) + "/" + String(avgTime) + "/" + String(maxTime) + " ms\r\n").c_str());
+                        result += String("             | RTT min/avg/max: " + String(minTime) + "/" + String(avgTime) + "/" + String(maxTime) + " ms\r\n");
                     }
                 }
             }
