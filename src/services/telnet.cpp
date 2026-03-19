@@ -15,42 +15,6 @@ void Telnet::Begin() {
 
         //Commands
 
-        // ver
-        devTelnetServer->onCommand("ver", "Show device version info\r\n\r\nver", [&](AsyncClient* client, String* parameter) {
-            client->write(String("Version      | " + Version.ProductFamily + " " + Version.Software.Info() + "\r\n").c_str());
-        });
-
-        devTelnetServer->onCommand("memory", "Show device memory information\r\n\r\nmemory", [&](AsyncClient* client, String* parameter) {
-            uint32_t heapFree  = ESP.getFreeHeap();
-            uint32_t heapTotal = ESP.getHeapSize();
-            uint32_t heapMin   = ESP.getMinFreeHeap();
-            uint32_t heapMax   = ESP.getMaxAllocHeap();
-
-            uint32_t internalFree  = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-            uint32_t internalTotal = heap_caps_get_total_size(MALLOC_CAP_INTERNAL);
-            uint32_t internalMin   = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
-
-            uint32_t psramFree  = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
-            uint32_t psramTotal = ESP.getPsramSize();
-
-            float heapPct     = (heapTotal > 0) ? ((float)heapFree / heapTotal) * 100.0 : 0;
-            float internalPct = (internalTotal > 0) ? ((float)internalFree / internalTotal) * 100.0 : 0;
-            float psramPct    = (psramTotal > 0) ? ((float)psramFree / psramTotal) * 100.0 : 0;
-
-            String result;
-
-            result += "Heap         | Free: " + String(heapFree) + " / " + String(heapTotal) + " bytes (" + String(heapPct, 1) + "%)\r\n";
-            result += "             | Minimum free: " + String(heapMin) + " bytes\r\n";
-            result += "             | Max allocatable block: " + String(heapMax) + " bytes\r\n\r\n";
-
-            result += "Internal RAM | Free: " + String(internalFree) + " / " + String(internalTotal) + " bytes (" + String(internalPct, 1) + "%)\r\n";
-            result += "             | Minimum free: " + String(internalMin) + " bytes\r\n\r\n";
-            
-            result += "PSRAM        | Free: " + String(psramFree) + " / " + String(psramTotal) + " bytes (" + String(psramPct, 1) + "%)\r\n";
-
-            client->write(result.c_str());
-        });
-
         devTelnetServer->onCommand("storage", "Show device storage information\r\n\r\nstorage", [&](AsyncClient* client, String* parameter) {
             uint32_t flashChipSize   = ESP.getFlashChipSize();
             uint32_t flashChipSpeed  = ESP.getFlashChipSpeed();
@@ -142,132 +106,11 @@ void Telnet::Begin() {
             }
         });
 
-        devTelnetServer->onCommand("ping", "Ping IP or host\r\n\r\nping [destination] [-n ntimes]", [&](AsyncClient* client, String* parameter) {
-            if (parameter[0].isEmpty()) {
-                client->write("Missing destination.\r\n");
-                return;
-            }
-
-            String destination = parameter[0];
-
-            struct hostent* host = gethostbyname(destination.c_str());
-            if (!host) {
-                client->write(String("ping: " + destination + ": Name or service not known\r\n").c_str());
-                return;
-            }
-
-            struct sockaddr_in target;
-            memset(&target, 0, sizeof(target));
-            target.sin_family = AF_INET;
-            target.sin_port = 0;
-            target.sin_addr.s_addr = *(uint32_t*)host->h_addr;
-
-            char ip[16];
-            inet_ntoa_r(target.sin_addr, ip, sizeof(ip));
-
-            bool isDnsName = true;
-            ip_addr_t tmpAddr;
-            if (ipaddr_aton(destination.c_str(), &tmpAddr)) {
-                isDnsName = false;
-            }
-
-            if (isDnsName)
-                client->write(String("PING " + destination + " (" + String(ip) + ") 32 bytes of data.\r\n").c_str());
-            else
-                client->write(String("PING " + destination + " 32 bytes of data.\r\n").c_str());
-
-            int sock = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
-            if (sock < 0) {
-                client->write("ping: cannot create socket\r\n");
-                return;
-            }
-
-            struct timeval timeout;
-            timeout.tv_sec = 1;
-            timeout.tv_usec = 0;
-            setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
-
-            uint16_t identifier = (uint16_t)(ESP.getEfuseMac() & 0xFFFF);
-
-            uint32_t sentCount = 0;
-            uint32_t recvCount = 0;
-            uint32_t minTime = 0xFFFFFFFF;
-            uint32_t maxTime = 0;
-            uint32_t totalTime = 0;
-
-            int ntimes = 4;
-            if (parameter[1].equalsIgnoreCase("-n")) ntimes = parameter[2].toInt();
-
-            for (int i = 0; i < ntimes; i++) {
-                struct icmp_echo_hdr icmp;
-                memset(&icmp, 0, sizeof(icmp));
-
-                icmp.type = ICMP_ECHO;
-                icmp.code = 0;
-                icmp.id = htons(identifier);
-                icmp.seqno = htons((uint16_t)i);
-
-                uint8_t packet[32];
-                memset(packet, 0, sizeof(packet));
-                memcpy(packet, &icmp, sizeof(icmp));
-
-                for (size_t j = sizeof(icmp); j < sizeof(packet); j++) packet[j] = (uint8_t)j;
-
-                ((struct icmp_echo_hdr*)packet)->chksum = 0;
-                ((struct icmp_echo_hdr*)packet)->chksum = inet_chksum(packet, sizeof(packet));
-
-                uint32_t start = millis();
-
-                int sent = sendto(sock, packet, sizeof(packet), 0, (struct sockaddr*)&target, sizeof(target));
-                sentCount++;
-
-                if (sent < 0) {
-                    client->write(String("From " + String(ip) + " icmp_seq=" + String(i + 1) + " send failed\r\n").c_str());
-                    delay(1000);
-                    continue;
-                }
-
-                uint8_t recvbuf[128];
-                struct sockaddr_in from;
-                socklen_t fromlen = sizeof(from);
-
-                int len = recvfrom(sock, recvbuf, sizeof(recvbuf), 0, (struct sockaddr*)&from, &fromlen);
-                uint32_t elapsed = millis() - start;
-
-                if (len > 0) {
-                    recvCount++;
-                    totalTime += elapsed;
-                    if (elapsed < minTime) minTime = elapsed;
-                    if (elapsed > maxTime) maxTime = elapsed;
-
-                    char fromIp[16];
-                    inet_ntoa_r(from.sin_addr, fromIp, sizeof(fromIp));
-
-                    client->write(String(String(sizeof(packet)) + " bytes from " + String(fromIp) + ": icmp_seq=" + String(i + 1) + " ttl=64 time=" + String(elapsed) + " ms\r\n").c_str());
-                } else {
-                    client->write(String("Request timeout for icmp_seq " + String(i + 1) + "\r\n").c_str());
-                }
-
-                delay(1000);
-            }
-
-            close(sock);
-
-            uint32_t loss = 0;
-            if (sentCount > 0) loss = ((sentCount - recvCount) * 100UL) / sentCount;
-
-            client->write("\r\n");
-            client->write(String("--- " + destination + " ping statistics ---\r\n").c_str());
-            client->write(String(String(sentCount) + " packets transmitted, " + String(recvCount) + " received, " + String(loss) + "% packet loss\r\n").c_str());
-
-            if (recvCount > 0) {
-                uint32_t avgTime = totalTime / recvCount;
-                client->write(String("rtt min/avg/max = " + String(minTime) + "/" + String(avgTime) + "/" + String(maxTime) + " ms\r\n").c_str());
-            }
-        }, true);
-
         registerCommand_network();
         registerCommand_ntp();
+        registerCommand_ver();
+        registerCommand_memory();
+        registerCommand_ping();
 
         devTelnetServer->onCommand("mqtt", "Show or change MQTT configuration\r\n\r\nmqtt [options]", [&](AsyncClient* client, String* parameter) {
             if (!parameter[0].isEmpty()) {
@@ -430,7 +273,6 @@ void Telnet::registerCommand_network() {
         client->write(result.c_str());
     }, true);
 }
-
 void Telnet::registerCommand_ntp() {
     devTelnetServer->onCommand("ntp", "Show or change NTP configuration\r\n\r\nntp [options]", [&](AsyncClient* client, String* parameter) {
         String result;
@@ -466,6 +308,167 @@ void Telnet::registerCommand_ntp() {
             result += "\r\nSettings changed - you must reboot to apply changes.\r\n";
             Settings.Save();
         }
+        client->write(result.c_str());
+    }, true);
+}
+void Telnet::registerCommand_ver() {
+    devTelnetServer->onCommand("ver", "Show device version info\r\n\r\nver", [&](AsyncClient* client, String* parameter) {
+        String result;
+
+        result += "Version      | Product:   " + Version.ProductName + "\r\n";
+        result += "             | Family:    " + Version.ProductFamily + "\r\n";
+        result += "             | Hardware:  " + Version.Hardware.Info() + "\r\n";
+        result += "             | Software:  " + Version.Software.Info() + "\r\n";
+
+        client->write(result.c_str());
+    });
+}
+void Telnet::registerCommand_memory() {
+    devTelnetServer->onCommand("memory", "Show device memory information\r\n\r\nmemory", [&](AsyncClient* client, String* parameter) {
+        String result;
+        
+        uint32_t heapFree = ESP.getFreeHeap();
+        uint32_t heapTotal = ESP.getHeapSize();
+        uint32_t heapMin = ESP.getMinFreeHeap();
+        uint32_t heapMax = ESP.getMaxAllocHeap();
+        uint32_t internalFree = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+        uint32_t internalTotal = heap_caps_get_total_size(MALLOC_CAP_INTERNAL);
+        uint32_t internalMin = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
+        uint32_t psramFree = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+        uint32_t psramTotal = ESP.getPsramSize();
+
+        float heapPct = (heapTotal > 0) ? ((float)heapFree / heapTotal) * 100.0 : 0;
+        float internalPct = (internalTotal > 0) ? ((float)internalFree / internalTotal) * 100.0 : 0;
+        float psramPct = (psramTotal > 0) ? ((float)psramFree / psramTotal) * 100.0 : 0;
+
+        result += "Heap         | Free:      " + String(heapFree) + " / " + String(heapTotal) + " bytes (" + String(heapPct, 1) + "%)\r\n";
+        result += "             | Min free:  " + String(heapMin) + " bytes\r\n";
+        result += "             | Max alloc: " + String(heapMax) + " bytes\r\n\r\n";
+        result += "Internal RAM | Free:      " + String(internalFree) + " / " + String(internalTotal) + " bytes (" + String(internalPct, 1) + "%)\r\n";
+        result += "             | Min free:  " + String(internalMin) + " bytes\r\n\r\n";
+        result += "PSRAM        | Free:      " + String(psramFree) + " / " + String(psramTotal) + " bytes (" + String(psramPct, 1) + "%)\r\n";
+
+        client->write(result.c_str());
+    });
+}
+void Telnet::registerCommand_ping() {
+    devTelnetServer->onCommand("ping", "Ping IP or host\r\n\r\nping [destination] [-n ntimes]", [&](AsyncClient* client, String* parameter) {
+        String result;
+
+        if (parameter[0].isEmpty()) {
+            result += "Ping         | Error: Missing destination\r\n";
+        } else {
+            String destination = parameter[0];
+            struct hostent* host = gethostbyname(destination.c_str());
+
+            if (!host) {
+                result += "Ping         | Error: " + destination + " - name or service not known\r\n";
+            } else {
+                struct sockaddr_in target;
+                memset(&target, 0, sizeof(target));
+                target.sin_family = AF_INET;
+                target.sin_port = 0;
+                target.sin_addr.s_addr = *(uint32_t*)host->h_addr;
+
+                char ip[16];
+                inet_ntoa_r(target.sin_addr, ip, sizeof(ip));
+
+                bool isDnsName = true;
+                ip_addr_t tmpAddr;
+                if (ipaddr_aton(destination.c_str(), &tmpAddr)) isDnsName = false;
+
+                if (isDnsName) result += "Ping         | Destination: " + String(ip) + " - 32 bytes of data.\r\n";
+                else result += "Ping         | Destination: " + destination + " - 32 bytes of data.\r\n";
+
+                int sock = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+                if (sock < 0) {
+                    result += "             | Error: Cannot create socket\r\n";
+                } else {
+                    struct timeval timeout;
+                    timeout.tv_sec = 1;
+                    timeout.tv_usec = 0;
+                    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+
+                    uint16_t identifier = (uint16_t)(ESP.getEfuseMac() & 0xFFFF);
+                    uint32_t sentCount = 0;
+                    uint32_t recvCount = 0;
+                    uint32_t minTime = 0xFFFFFFFF;
+                    uint32_t maxTime = 0;
+                    uint32_t totalTime = 0;
+
+                    int ntimes = 4;
+                    if (parameter[1].equalsIgnoreCase("-n")) ntimes = parameter[2].toInt();
+
+                    for (int i = 0; i < ntimes; i++) {
+                        struct icmp_echo_hdr icmp;
+                        memset(&icmp, 0, sizeof(icmp));
+
+                        icmp.type = ICMP_ECHO;
+                        icmp.code = 0;
+                        icmp.id = htons(identifier);
+                        icmp.seqno = htons((uint16_t)i);
+
+                        uint8_t packet[32];
+                        memset(packet, 0, sizeof(packet));
+                        memcpy(packet, &icmp, sizeof(icmp));
+
+                        for (size_t j = sizeof(icmp); j < sizeof(packet); j++) packet[j] = (uint8_t)j;
+
+                        ((struct icmp_echo_hdr*)packet)->chksum = 0;
+                        ((struct icmp_echo_hdr*)packet)->chksum = inet_chksum(packet, sizeof(packet));
+
+                        uint32_t start = millis();
+
+                        int sent = sendto(sock, packet, sizeof(packet), 0, (struct sockaddr*)&target, sizeof(target));
+                        sentCount++;
+
+                        if (sent < 0) {
+                            client->write(String("From " + String(ip) + " icmp_seq=" + String(i + 1) + " send failed\r\n").c_str());
+                            delay(1000);
+                            continue;
+                        }
+
+                        uint8_t recvbuf[128];
+                        struct sockaddr_in from;
+                        socklen_t fromlen = sizeof(from);
+
+                        int len = recvfrom(sock, recvbuf, sizeof(recvbuf), 0, (struct sockaddr*)&from, &fromlen);
+                        uint32_t elapsed = millis() - start;
+
+                        if (len > 0) {
+                            recvCount++;
+                            totalTime += elapsed;
+                            if (elapsed < minTime) minTime = elapsed;
+                            if (elapsed > maxTime) maxTime = elapsed;
+
+                            char fromIp[16];
+                            inet_ntoa_r(from.sin_addr, fromIp, sizeof(fromIp));
+
+                            client->write(String(String(sizeof(packet)) + " bytes from " + String(fromIp) + ": icmp_seq=" + String(i + 1) + " ttl=64 time=" + String(elapsed) + " ms\r\n").c_str());
+                        } else {
+                            client->write(String("Request timeout for icmp_seq " + String(i + 1) + "\r\n").c_str());
+                        }
+
+                        delay(1000);
+                    }
+
+                    close(sock);
+
+                    uint32_t loss = 0;
+                    if (sentCount > 0) loss = ((sentCount - recvCount) * 100UL) / sentCount;
+
+                    client->write("\r\n");
+                    client->write(String("--- " + destination + " ping statistics ---\r\n").c_str());
+                    client->write(String(String(sentCount) + " packets transmitted, " + String(recvCount) + " received, " + String(loss) + "% packet loss\r\n").c_str());
+
+                    if (recvCount > 0) {
+                        uint32_t avgTime = totalTime / recvCount;
+                        client->write(String("rtt min/avg/max = " + String(minTime) + "/" + String(avgTime) + "/" + String(maxTime) + " ms\r\n").c_str());
+                    }
+                }
+            }
+        }
+
         client->write(result.c_str());
     }, true);
 }
