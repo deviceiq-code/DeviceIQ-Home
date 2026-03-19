@@ -266,27 +266,8 @@ void Telnet::Begin() {
             }
         }, true);
 
-        // network
         registerCommand_network();
-
-        devTelnetServer->onCommand("ntp", "Show or change NTP configuration\r\n\r\nntp [options]", [&](AsyncClient* client, String* parameter) {
-            if (!parameter[0].isEmpty()) {
-                if (parameter[0].equalsIgnoreCase("enable") || parameter[0].equalsIgnoreCase("true") || parameter[0].equalsIgnoreCase("on") || parameter[0].equalsIgnoreCase("yes")) {
-                    Settings.General.NTPUpdate(true);
-                } else if (parameter[0].equalsIgnoreCase("disable") || parameter[0].equalsIgnoreCase("false") || parameter[0].equalsIgnoreCase("off") || parameter[0].equalsIgnoreCase("no")) {
-                    Settings.General.NTPUpdate(false);
-                } else {
-                    Settings.General.NTPServer(parameter[0]);
-                }
-
-                Settings.Save();
-            }
-
-            String result;
-            result += "NTP          | Enabled: " + String(Settings.General.NTPUpdate() ? "Yes" : "No") + "\r\n";
-            result += "             | Server: " + Settings.General.NTPServer() + "\r\n";
-            client->write(result.c_str());
-        }, true);
+        registerCommand_ntp();
 
         devTelnetServer->onCommand("mqtt", "Show or change MQTT configuration\r\n\r\nmqtt [options]", [&](AsyncClient* client, String* parameter) {
             if (!parameter[0].isEmpty()) {
@@ -393,18 +374,17 @@ void Telnet::registerCommand_network() {
                 }
                 result += "Network      | Hostname:  " + LimitString(devNetwork->Hostname(), 30, true) + LimitString(Settings.Network.Hostname(), 30, true) + "\r\n";
             } else if (parameter[0].equalsIgnoreCase("dhcp")) {
-                if (parameter[1].equalsIgnoreCase("enable") || parameter[1].equalsIgnoreCase("true") || parameter[1].equalsIgnoreCase("on") || parameter[1].equalsIgnoreCase("yes")) {
+                if (parameter[1].equalsIgnoreCase("true") || parameter[1].equalsIgnoreCase("on") || parameter[1].equalsIgnoreCase("yes")) {
                     if (!Settings.Network.DHCPClient()) {
                         Settings.Network.DHCPClient(true);
                         changed = true;
                     }
-                } else if (parameter[1].equalsIgnoreCase("disable") || parameter[1].equalsIgnoreCase("false") || parameter[1].equalsIgnoreCase("off") || parameter[1].equalsIgnoreCase("no")) {
+                } else if (parameter[1].equalsIgnoreCase("false") || parameter[1].equalsIgnoreCase("off") || parameter[1].equalsIgnoreCase("no")) {
                     if (Settings.Network.DHCPClient()) {
                         Settings.Network.DHCPClient(false);
                         changed = true;
                     }
-                } 
-
+                }
                 result += "Network      | DHCP:      " + LimitString(devNetwork->DHCP_Client() ? "Yes" : "No", 30, true) + LimitString(Settings.Network.DHCPClient() ? "Yes" : "No", 30, true) + "\r\n";
             } else if (parameter[0].equalsIgnoreCase("ip")) {
                 if (!parameter[1].isEmpty() && !Settings.Network.IP_Address().toString().equalsIgnoreCase(parameter[1])) {
@@ -441,6 +421,45 @@ void Telnet::registerCommand_network() {
             }  else {
                 result += "Invalid network parameter.\r\n";
             }
+        }
+        
+        if (changed) {
+            result += "\r\nSettings changed - you must reboot to apply changes.\r\n";
+            Settings.Save();
+        }
+        client->write(result.c_str());
+    }, true);
+}
+
+void Telnet::registerCommand_ntp() {
+    devTelnetServer->onCommand("ntp", "Show or change NTP configuration\r\n\r\nntp [options]", [&](AsyncClient* client, String* parameter) {
+        String result;
+        bool changed = false;
+
+        if (parameter[0].isEmpty()) {
+            result += "NTP          | Enabled:   " + LimitString(Settings.General.NTPUpdate() ? "Yes" : "No", 30, true) + "\r\n";
+            result += "             | Server:    " + LimitString(Settings.General.NTPServer(), 30, true) + "\r\n";
+        } else if (parameter[0].equalsIgnoreCase("enabled")) {
+            if (parameter[1].equalsIgnoreCase("true") || parameter[1].equalsIgnoreCase("on") || parameter[1].equalsIgnoreCase("yes")) {
+                if (!Settings.General.NTPUpdate()) {
+                    Settings.General.NTPUpdate(true);
+                    changed = true;
+                }
+            } else if (parameter[1].equalsIgnoreCase("false") || parameter[1].equalsIgnoreCase("off") || parameter[1].equalsIgnoreCase("no")) {
+                if (Settings.General.NTPUpdate()) {
+                    Settings.General.NTPUpdate(false);
+                    changed = true;
+                }
+            }
+            result += "NTP          | Enabled:   " + LimitString(Settings.General.NTPUpdate() ? "Yes" : "No", 30, true) + "\r\n";
+        } else if (parameter[0].equalsIgnoreCase("server")) {
+            if (!parameter[1].isEmpty() && !Settings.General.NTPServer().equalsIgnoreCase(parameter[1])) {
+                Settings.General.NTPServer(parameter[1]);
+                changed = true;
+            }
+            result += "NTP          | Server:    " + LimitString(Settings.General.NTPServer(), 30, true) + "\r\n";
+        } else {
+            result += "Invalid ntp parameter.\r\n";
         }
         
         if (changed) {

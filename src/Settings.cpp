@@ -625,10 +625,8 @@ bool settings_t::Load(const String& configfilename) noexcept {
 
         if (net["DNS Servers"].is<JsonArrayConst>()) {
             JsonArrayConst dns = net["DNS Servers"].as<JsonArrayConst>();
-            uint8_t idx = 0;
-            for (JsonVariantConst v : dns) {
-                if (idx >= 2) break;
-                Network.DNS(idx, v);
+            for (uint8_t idx = 0; idx < dns.size() && idx < 2; idx++) {
+                Network.DNS(idx, dns[idx].as<String>());
             }
         }
 

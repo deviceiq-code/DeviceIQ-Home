@@ -11,4 +11,5 @@ class Telnet {
         static void Begin();
     private:
         static void registerCommand_network();
+        static void registerCommand_ntp();
 };
