@@ -26,8 +26,6 @@ void Telnet::Begin() {
         registerCommand_webserver();
         registerCommand_mqtt();
         registerCommand_comp();
-        registerCommand_bus();
-        registerCommand_class();
         
         devTelnetServer->begin();
         devLog->Write("Telnet Server: Enabled on port " + String(Settings.TelnetServer.Port()), LOGLEVEL_INFO);
@@ -549,44 +547,73 @@ void Telnet::registerCommand_comp() {
             for (auto m : Settings.Components) {
                 result += "               | " + EnumToString(AvailableComponentClasses, m->Class()) + ": " + m->Name() + "\r\n";
             }
+        } else if (parameter[0].equalsIgnoreCase("bus")) {
+            result += "Buses          | Count: " + String(AvailableComponentBuses.size()) + "\r\n\r\n";
+            for (auto m : AvailableComponentBuses) {
+                result += "               | " + m.first + ":" + String(m.second) + "\r\n";
+            }
+        } else if (parameter[0].equalsIgnoreCase("class")) {
+            result += "Classes        | Count: " + String(AvailableComponentClasses.size()) + "\r\n\r\n";
+            for (auto m : AvailableComponentClasses) {
+                result += "               | " + m.first + ":" + String(m.second) + "\r\n";
+            }
         } else if (parameter[0].equalsIgnoreCase("remove")) {
             if (!parameter[1].isEmpty()) {
                 if (Settings.Components.Remove(parameter[1]) != -1) {
                     result += "Components     | Component '" + parameter[1] + "' removed.\r\n";
-                    Settings.Save();
+                    changed = true;
                 } else {
                     result += "Components     | Error removing component '" + parameter[1] + "'.\r\n";
                 }
             }
+        } else if (parameter[0].equalsIgnoreCase("add")) {
+            if (!parameter[1].isEmpty() && !parameter[2].isEmpty() && !parameter[3].isEmpty() && !parameter[4].isEmpty() && !parameter[5].isEmpty()) {
+                String comp_name = parameter[1];
+
+                if (Settings.Components.IndexOf(comp_name) != -1) {
+                    result += "Components     | Component '" + comp_name + "' already exists.\r\n";
+                } else {
+                    String comp_class = parameter[2];
+                    String comp_bus = parameter[3];
+                    uint8_t comp_address = parameter[4].toInt();
+                    String comp_option = parameter[5];
+
+                    bool added = false;
+                    
+                    Generic *NewComponent = nullptr;
+                    Classes c = AvailableComponentClasses.at(comp_class);
+
+                    switch (c) {
+                        case CLASS_BUTTON: {
+                            NewComponent = new Button(comp_name,Settings.Components.Count() + 1, AvailableComponentBuses.at(comp_bus), comp_address, (comp_option.equalsIgnoreCase("EdgesOnly") ? ButtonReportModes::BUTTONREPORTMODE_EDGESONLY : ButtonReportModes::BUTTONREPORTMODE_CLICKSONLY));
+                            added = true;
+                        } break;
+
+                        default:
+                            break;
+                    }
+
+                    if (added) {
+                        Settings.Components.Add(NewComponent);
+                        changed = true;
+
+                        result += "Components     | New component '" + comp_name + "' added\r\n";
+                        result += "               | Class: " + comp_class + "\r\n";
+                    } else {
+                        result += "Components     | Error while adding component '" + comp_name + "'.\r\n";
+                    }
+                }
+            } else {
+                result += "Components     | Missing new component parameters.\r\n";
+            }
         } else {
             result += "Components     | Invalid comp parameter.\r\n";
         }
-        client->write(result.c_str());
-    });
-}
-void Telnet::registerCommand_bus() {
-    devTelnetServer->onCommand("bus", "Show available component buses\r\n\r\nbus", [&](AsyncClient* client, String* parameter) {
-        String result;
-        bool changed = false;
 
-        result += "Buses          | Count: " + String(AvailableComponentBuses.size()) + "\r\n\r\n";
-        for (auto m : AvailableComponentBuses) {
-            result += "               | " + m.first + ":" + String(m.second) + "\r\n";
+        if (changed) {
+            result += "\r\n               | Settings changed - you must reboot to apply changes.\r\n";
+            Settings.Save();
         }
-
         client->write(result.c_str());
-    });
-}
-void Telnet::registerCommand_class() {
-    devTelnetServer->onCommand("class", "Show available component classes\r\n\r\nclass", [&](AsyncClient* client, String* parameter) {
-        String result;
-        bool changed = false;
-
-        result += "Classes        | Count: " + String(AvailableComponentClasses.size()) + "\r\n\r\n";
-        for (auto m : AvailableComponentClasses) {
-            result += "               | " + m.first + ":" + String(m.second) + "\r\n";
-        }
-
-        client->write(result.c_str());
-    });
+    }, true);
 }

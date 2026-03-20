@@ -26,6 +26,7 @@ extern Log *devLog;
 extern MQTT *devMQTT;
 
 #include "Defaults.h"
+#include "Tools.h"
 
 #define PASS_PBKDF2_ITERATIONS  10000
 #define PASS_SALTLEN            16    // 128-bit salt

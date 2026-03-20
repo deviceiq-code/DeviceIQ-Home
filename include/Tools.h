@@ -74,4 +74,7 @@ String urlEncode(const String &str);
 
 inline void DeviceRestart() { esp_sleep_enable_timer_wakeup(200 * 1000); esp_deep_sleep_start(); }
 
+inline String ClassToString(Classes value) {for (const auto& m : AvailableComponentClasses) { if (m.second == value) return m.first; } return ""; }
+inline String BusToString(Buses value) {for (const auto& m : AvailableComponentBuses) { if (m.second == value) return m.first; } return ""; }
+
 #endif

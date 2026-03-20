@@ -1152,10 +1152,55 @@ bool settings_t::Save(const String& configfilename) const noexcept {
         tn["Port"] = TelnetServer.Port();
     }
 
-    if (existingDoc["Components"].is<JsonArrayConst>()) {
-        doc["Components"] = existingDoc["Components"];
-    } else {
-        (void)doc["Components"].to<JsonArray>();
+    // Components
+    {
+        JsonArray components = doc["Components"].to<JsonArray>();
+
+        // 1) Mantém do arquivo apenas o que ainda existe em memória
+        if (existingDoc["Components"].is<JsonArrayConst>()) {
+            for (JsonObjectConst existingItem : existingDoc["Components"].as<JsonArrayConst>()) {
+                String existingName = existingItem["Name"] | "";
+
+                if (Settings.Components.IndexOf(existingName) != -1) {
+                    JsonObject item = components.add<JsonObject>();
+                    item.set(existingItem);
+                }
+            }
+        }
+
+        // 2) Adiciona os novos que ainda não estavam no arquivo
+        for (auto* m : Settings.Components) {
+            bool found = false;
+
+            for (JsonObject item : components) {
+                String name = item["Name"] | "";
+                if (name.equalsIgnoreCase(m->Name())) {
+                    found = true;
+                    break;
+                }
+            }
+
+            if (found) continue;
+
+            JsonObject item = components.add<JsonObject>();
+            item["Name"] = m->Name();
+            item["Class"] = EnumToString(AvailableComponentClasses, m->Class());
+            item["Bus"] = EnumToString(AvailableComponentBuses, m->Bus());
+            item["Address"] = m->Address();
+            item["Enabled"] = m->Enabled();
+            item["Events"] = JsonObject();
+
+            if (m->Class() == CLASS_BUTTON) {
+                item["Report"] =
+                    (m->as<Button>()->ReportMode() == ButtonReportModes::BUTTONREPORTMODE_EDGESONLY)
+                    ? "EdgesOnly"
+                    : "ClicksOnly";
+            }
+
+            if (m->Class() == CLASS_RELAY) {
+                item["State"] = m->as<Relay>()->State();
+            }
+        }
     }
 
     File fw = devFileSystem->OpenFile(path, "w");
