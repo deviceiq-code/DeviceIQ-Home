@@ -21,5 +21,7 @@ class Telnet {
         static void registerCommand_telnet();
         static void registerCommand_webserver();
         static void registerCommand_mqtt();
-        static void registerCommand_cmp();
+        static void registerCommand_comp();
+        static void registerCommand_bus();
+        static void registerCommand_class();
 };

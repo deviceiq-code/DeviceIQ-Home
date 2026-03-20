@@ -25,7 +25,9 @@ void Telnet::Begin() {
         registerCommand_telnet();
         registerCommand_webserver();
         registerCommand_mqtt();
-        registerCommand_cmp();
+        registerCommand_comp();
+        registerCommand_bus();
+        registerCommand_class();
         
         devTelnetServer->begin();
         devLog->Write("Telnet Server: Enabled on port " + String(Settings.TelnetServer.Port()), LOGLEVEL_INFO);
@@ -537,19 +539,54 @@ void Telnet::registerCommand_mqtt() {
         client->write(result.c_str());
     }, true);
 }
-void Telnet::registerCommand_cmp() {
-    devTelnetServer->onCommand("cmp", "Manage components\r\n\r\ncmp", [&](AsyncClient* client, String* parameter) {
-        if (parameter[0].isEmpty()) {
-            client->write("Missing parameters.\r\n");
-        } else {
-            if (parameter[0].equalsIgnoreCase("list")) {
-                String result;
-                result += "Components     | Count: " + String(Settings.Components.Count()) + "\r\n";
-                for (auto m : Settings.Components) {
-                    result += "               | " + EnumToString(AvailableComponentClasses, m->Class()) + ": " + m->Name() + "\r\n";
-                }
-                client->write(result.c_str());
+void Telnet::registerCommand_comp() {
+    devTelnetServer->onCommand("comp", "Manage components\r\n\r\ncomp", [&](AsyncClient* client, String* parameter) {
+        String result;
+        bool changed = false;
+
+        if (parameter[0].equalsIgnoreCase("list")) {
+            result += "Components     | Count: " + String(Settings.Components.Count()) + "\r\n";
+            for (auto m : Settings.Components) {
+                result += "               | " + EnumToString(AvailableComponentClasses, m->Class()) + ": " + m->Name() + "\r\n";
             }
+        } else if (parameter[0].equalsIgnoreCase("remove")) {
+            if (!parameter[1].isEmpty()) {
+                if (Settings.Components.Remove(parameter[1]) != -1) {
+                    result += "Components     | Component '" + parameter[1] + "' removed.\r\n";
+                    Settings.Save();
+                } else {
+                    result += "Components     | Error removing component '" + parameter[1] + "'.\r\n";
+                }
+            }
+        } else {
+            result += "Components     | Invalid comp parameter.\r\n";
         }
+        client->write(result.c_str());
+    });
+}
+void Telnet::registerCommand_bus() {
+    devTelnetServer->onCommand("bus", "Show available component buses\r\n\r\nbus", [&](AsyncClient* client, String* parameter) {
+        String result;
+        bool changed = false;
+
+        result += "Buses          | Count: " + String(AvailableComponentBuses.size()) + "\r\n\r\n";
+        for (auto m : AvailableComponentBuses) {
+            result += "               | " + m.first + ":" + String(m.second) + "\r\n";
+        }
+
+        client->write(result.c_str());
+    });
+}
+void Telnet::registerCommand_class() {
+    devTelnetServer->onCommand("class", "Show available component classes\r\n\r\nclass", [&](AsyncClient* client, String* parameter) {
+        String result;
+        bool changed = false;
+
+        result += "Classes        | Count: " + String(AvailableComponentClasses.size()) + "\r\n\r\n";
+        for (auto m : AvailableComponentClasses) {
+            result += "               | " + m.first + ":" + String(m.second) + "\r\n";
+        }
+
+        client->write(result.c_str());
     });
 }
