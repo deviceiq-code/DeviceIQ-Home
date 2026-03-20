@@ -589,6 +589,11 @@ void Telnet::registerCommand_comp() {
                             added = true;
                         } break;
 
+                        case CLASS_RELAY: {
+                            NewComponent = new Relay(comp_name,Settings.Components.Count() + 1, AvailableComponentBuses.at(comp_bus), comp_address, (comp_option.equalsIgnoreCase("NormallyOpened") ? RelayTypes::RELAYTYPE_NORMALLYOPENED : RelayTypes::RELAYTYPE_NORMALLYCLOSED));
+                            added = true;
+                        } break;
+
                         default:
                             break;
                     }
