@@ -581,40 +581,84 @@ void Telnet::registerCommand_comp() {
                     bool added = false;
                     
                     Generic *NewComponent = nullptr;
-                    Classes c = AvailableComponentClasses.at(comp_class);
 
-                    switch (c) {
-                        case CLASS_BUTTON: {
-                            NewComponent = new Button(comp_name,Settings.Components.Count() + 1, AvailableComponentBuses.at(comp_bus), comp_address, (comp_option.equalsIgnoreCase("EdgesOnly") ? ButtonReportModes::BUTTONREPORTMODE_EDGESONLY : ButtonReportModes::BUTTONREPORTMODE_CLICKSONLY));
-                            added = true;
-                        } break;
-
-                        case CLASS_CONTACTSENSOR: {
-                            NewComponent = new ContactSensor(comp_name,Settings.Components.Count() + 1, AvailableComponentBuses.at(comp_bus), comp_address, (comp_option.equalsIgnoreCase("Invert") ? true : false));
-                            added = true;
-                        } break;
-
-                        case CLASS_RELAY: {
-                            NewComponent = new Relay(comp_name,Settings.Components.Count() + 1, AvailableComponentBuses.at(comp_bus), comp_address, (comp_option.equalsIgnoreCase("NormallyOpened") ? RelayTypes::RELAYTYPE_NORMALLYOPENED : RelayTypes::RELAYTYPE_NORMALLYCLOSED));
-                            added = true;
-                        } break;
-
-                        default:
-                            break;
-                    }
-
-                    if (added) {
-                        Settings.Components.Add(NewComponent);
-                        changed = true;
-
-                        result += "Components     | New component '" + comp_name + "' added\r\n";
-                        result += "               | Class: " + comp_class + "\r\n";
+                    auto it_class = AvailableComponentClasses.find(comp_class);
+                    if (it_class == AvailableComponentClasses.end()) {
+                        result += "Components     | Invalid class '" + comp_class + "'.\r\n";
                     } else {
-                        result += "Components     | Error while adding component '" + comp_name + "'.\r\n";
+                        Classes c = it_class->second;
+
+                        auto it_bus = AvailableComponentBuses.find(comp_bus);
+                        if (it_bus == AvailableComponentBuses.end()) {
+                            result += "Components     | Invalid bus '" + comp_bus + "'.\r\n";
+                        } else {
+                            switch (c) {
+                                case CLASS_BLINDS: {
+
+                                } break;
+
+                                case CLASS_BUTTON: {
+                                    NewComponent = new Button(comp_name, Settings.Components.Count() + 1, AvailableComponentBuses.at(comp_bus), comp_address, (comp_option.equalsIgnoreCase("EdgesOnly") ? ButtonReportModes::BUTTONREPORTMODE_EDGESONLY : ButtonReportModes::BUTTONREPORTMODE_CLICKSONLY));
+                                    added = true;
+                                } break;
+
+                                case CLASS_CONTACTSENSOR: {
+                                    NewComponent = new ContactSensor(comp_name, Settings.Components.Count() + 1, AvailableComponentBuses.at(comp_bus), comp_address, (comp_option.equalsIgnoreCase("Invert") ? true : false));
+                                    added = true;
+                                } break;
+
+                                case CLASS_CURRENTMETER: {
+                                    NewComponent = new Currentmeter(comp_name, Settings.Components.Count() + 1, AvailableComponentBuses.at(comp_bus), comp_address);
+                                    added = true;
+                                } break;
+
+                                case CLASS_DOORBELL: {
+                                    NewComponent = new Doorbell(comp_name, Settings.Components.Count() + 1, AvailableComponentBuses.at(comp_bus), comp_address);
+                                    added = true;
+                                } break;
+
+                                case CLASS_PIR: {
+                                    NewComponent = new PIR(comp_name, Settings.Components.Count() + 1, AvailableComponentBuses.at(comp_bus), comp_address);
+                                    added = true;
+                                } break;
+
+                                case CLASS_RELAY: {
+                                    NewComponent = new Relay(comp_name, Settings.Components.Count() + 1, AvailableComponentBuses.at(comp_bus), comp_address, (comp_option.equalsIgnoreCase("NormallyOpened") ? RelayTypes::RELAYTYPE_NORMALLYOPENED : RelayTypes::RELAYTYPE_NORMALLYCLOSED));
+                                    added = true;
+                                } break;
+
+                                case CLASS_THERMOMETER: {
+                                    ThermometerTypes comp_type = THERMOMETERTYPE_DHT11;
+
+                                    if (comp_option.equalsIgnoreCase("DHT11")) comp_type = THERMOMETERTYPE_DHT11;
+                                    else if (comp_option.equalsIgnoreCase("DHT12")) comp_type = THERMOMETERTYPE_DHT12;
+                                    else if (comp_option.equalsIgnoreCase("DHT21")) comp_type = THERMOMETERTYPE_DHT21;
+                                    else if (comp_option.equalsIgnoreCase("DHT22")) comp_type = THERMOMETERTYPE_DHT22;
+                                    else if (comp_option.equalsIgnoreCase("DS18B20")) comp_type = THERMOMETERTYPE_DS18B20;
+
+                                    NewComponent = new Thermometer(comp_name, Settings.Components.Count() + 1, AvailableComponentBuses.at(comp_bus), comp_address, comp_type);
+                                    added = true;
+                                } break;
+
+                                default:
+                                    break;
+                            }
+
+                            if (added) {
+                                Settings.Components.Add(NewComponent);
+                                changed = true;
+
+                                result += "Components     | New component '" + comp_name + "' added\r\n";
+                                result += "               | Class: " + comp_class + "\r\n";
+                            } else {
+                                result += "Components     | Error while adding component '" + comp_name + "'.\r\n";
+                            }
+                        }
                     }
                 }
             } else {
                 result += "Components     | Missing new component parameters.\r\n";
+                result += "               | comp add [name] [class] [bus] [address] [options]\r\n";
             }
         } else {
             result += "Components     | Invalid comp parameter.\r\n";
