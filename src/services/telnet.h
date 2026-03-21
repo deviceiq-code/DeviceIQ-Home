@@ -10,6 +10,7 @@ class Telnet {
     public:
         static void Begin();
     private:
+        static void registerCommand_dumpcfg();
         static void registerCommand_logon();
         static void registerCommand_reboot();
         static void registerCommand_network();

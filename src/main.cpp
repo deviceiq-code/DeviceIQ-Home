@@ -18,7 +18,6 @@ void setup() {
 
     // Settings
     Settings.Load();
-    // Settings.Users.Add("a", "a", true);
 
     // Clock
     devClock = new Clock();

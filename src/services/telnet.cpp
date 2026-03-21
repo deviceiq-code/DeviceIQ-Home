@@ -14,6 +14,7 @@ void Telnet::Begin() {
         };
 
         //Commands
+        registerCommand_dumpcfg();
         registerCommand_logon();
         registerCommand_reboot();
         registerCommand_network();
@@ -35,6 +36,37 @@ void Telnet::Begin() {
     }
 }
 
+void Telnet::registerCommand_dumpcfg() {
+    devTelnetServer->onCommand("dumpcfg", "Prints the configuration file\r\n\r\ndumpcfg", [&](AsyncClient* client, String* parameter) {
+        String result;
+        const String path = Defaults.ConfigFileName;
+
+        File f = devFileSystem->OpenFile(path, "r");
+        if (!f) {
+            result += "Config         | Error opening config file '" + path + "'.\r\n";
+            client->write(result.c_str());
+            return;
+        }
+
+        result += "Config         | File: " + path + "\r\n\r\n";
+
+        while (f.available()) {
+            String line = f.readStringUntil('\n');
+            result += line + "\r\n";
+
+            if (result.length() > 2048) {
+                client->write(result.c_str());
+                result.clear();
+            }
+        }
+
+        f.close();
+
+        if (!result.isEmpty()) {
+            client->write(result.c_str());
+        }
+    }, true);
+}
 void Telnet::registerCommand_logon() {
     devTelnetServer->onCommand("logon", "Log into the system with specific credential\r\n\r\nlogon [username] [password]", [&](AsyncClient* client, String* parameter) {
         String result;
