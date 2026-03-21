@@ -4,7 +4,7 @@ void Telnet::Begin() {
     if (Settings.TelnetServer.Enabled() == true) {
         devTelnetServer = new AsyncTelnetServer(Settings.TelnetServer.Port());
 
-        devTelnetServer->WelcomeMessage = Version.ProductFamily + " " + Settings.Network.Hostname() + " - Welcome";
+        devTelnetServer->WelcomeMessage = ":: " + Version.ProductFamily + " " + Settings.Network.Hostname() + " - Welcome";
         
         devTelnetServer->onSessionBegin = [&](AsyncClient* client, AsyncTelnetSession* session) {
             devLog->Write("Telnet Server: Session started " + String(session->User + "@" + session->RemoteIP.toString() + ":" + session->RemotePort), LOGLEVEL_INFO);
@@ -36,7 +36,7 @@ void Telnet::Begin() {
     }
 }
 
-void Telnet::registerCommand_dumpcfg() {
+void Telnet::registerCommand_dumpcfg(bool admincmd) {
     devTelnetServer->onCommand("dumpcfg", "Prints the configuration file\r\n\r\ndumpcfg", [&](AsyncClient* client, String* parameter) {
         String result;
         const String path = Defaults.ConfigFileName;
@@ -65,9 +65,9 @@ void Telnet::registerCommand_dumpcfg() {
         if (!result.isEmpty()) {
             client->write(result.c_str());
         }
-    }, true);
+    }, admincmd);
 }
-void Telnet::registerCommand_logon() {
+void Telnet::registerCommand_logon(bool admincmd) {
     devTelnetServer->onCommand("logon", "Log into the system with specific credential\r\n\r\nlogon [username] [password]", [&](AsyncClient* client, String* parameter) {
         String result;
         
@@ -107,14 +107,14 @@ void Telnet::registerCommand_logon() {
             }
         }
         client->write(result.c_str());
-    });
+    }, admincmd);
 }
-void Telnet::registerCommand_reboot() {
+void Telnet::registerCommand_reboot(bool admincmd) {
     devTelnetServer->onCommand("reboot", "Reboot the device\r\n\r\nreboot", [&](AsyncClient* client, String* parameter) {
         DeviceRestart();
-    }, true);
+    }, admincmd);
 }
-void Telnet::registerCommand_network() {
+void Telnet::registerCommand_network(bool admincmd) {
     devTelnetServer->onCommand("network", "Show or change network configuration\r\n\r\nnetwork [options]", [&](AsyncClient* client, String* parameter) {
         String result;
         bool changed = false;
@@ -191,9 +191,9 @@ void Telnet::registerCommand_network() {
             Settings.Save();
         }
         client->write(result.c_str());
-    }, true);
+    }, admincmd);
 }
-void Telnet::registerCommand_ntp() {
+void Telnet::registerCommand_ntp(bool admincmd) {
     devTelnetServer->onCommand("ntp", "Show or change NTP configuration\r\n\r\nntp [options]", [&](AsyncClient* client, String* parameter) {
         String result;
         bool changed = false;
@@ -229,9 +229,9 @@ void Telnet::registerCommand_ntp() {
             Settings.Save();
         }
         client->write(result.c_str());
-    }, true);
+    }, admincmd);
 }
-void Telnet::registerCommand_ver() {
+void Telnet::registerCommand_ver(bool admincmd) {
     devTelnetServer->onCommand("ver", "Show device version info\r\n\r\nver", [&](AsyncClient* client, String* parameter) {
         String result;
 
@@ -241,9 +241,9 @@ void Telnet::registerCommand_ver() {
         result += "               | Software: " + Version.Software.Info() + "\r\n";
 
         client->write(result.c_str());
-    });
+    }, admincmd);
 }
-void Telnet::registerCommand_memory() {
+void Telnet::registerCommand_memory(bool admincmd) {
     devTelnetServer->onCommand("memory", "Show device memory information\r\n\r\nmemory", [&](AsyncClient* client, String* parameter) {
         String result;
         
@@ -269,9 +269,9 @@ void Telnet::registerCommand_memory() {
         result += "PSRAM          | Free: " + String(psramFree) + "/" + String(psramTotal) + " bytes (" + String(psramPct, 1) + "%)\r\n";
 
         client->write(result.c_str());
-    });
+    }, admincmd);
 }
-void Telnet::registerCommand_storage() {
+void Telnet::registerCommand_storage(bool admincmd) {
     devTelnetServer->onCommand("storage", "Show device storage information\r\n\r\nstorage", [&](AsyncClient* client, String* parameter) {
         String result;
 
@@ -300,9 +300,9 @@ void Telnet::registerCommand_storage() {
         result += "               | Free: " + String(fsTotal - fsUsed) + " / " + String(fsTotal) + " bytes (" + String(fsFreePct, 1) + "%)\r\n";
 
         client->write(result.c_str());
-    });
+    }, admincmd);
 }
-void Telnet::registerCommand_ping() {
+void Telnet::registerCommand_ping(bool admincmd) {
     devTelnetServer->onCommand("ping", "Ping IP or host\r\n\r\nping [destination] [-n ntimes]", [&](AsyncClient* client, String* parameter) {
         String result;
 
@@ -422,9 +422,9 @@ void Telnet::registerCommand_ping() {
         }
 
         client->write(result.c_str());
-    }, true);
+    }, admincmd);
 }
-void Telnet::registerCommand_telnet() {
+void Telnet::registerCommand_telnet(bool admincmd) {
     devTelnetServer->onCommand("telnet", "Show or change Telnet configuration\r\n\r\ntelnet [options]", [&](AsyncClient* client, String* parameter) {
         String result;
         bool changed = false;
@@ -461,9 +461,9 @@ void Telnet::registerCommand_telnet() {
             Settings.Save();
         }
         client->write(result.c_str());
-    }, true);
+    }, admincmd);
 }
-void Telnet::registerCommand_webserver() {
+void Telnet::registerCommand_webserver(bool admincmd) {
     devTelnetServer->onCommand("webserver", "Show or change WerServer configuration\r\n\r\nwebserver [options]", [&](AsyncClient* client, String* parameter) {
         String result;
         bool changed = false;
@@ -507,9 +507,9 @@ void Telnet::registerCommand_webserver() {
             Settings.Save();
         }
         client->write(result.c_str());
-    }, true);
+    }, admincmd);
 }
-void Telnet::registerCommand_mqtt() {
+void Telnet::registerCommand_mqtt(bool admincmd) {
     devTelnetServer->onCommand("mqtt", "Show or change mqtt configuration\r\n\r\nmqtt [options]", [&](AsyncClient* client, String* parameter) {
         String result;
         bool changed = false;
@@ -567,9 +567,9 @@ void Telnet::registerCommand_mqtt() {
             Settings.Save();
         }
         client->write(result.c_str());
-    }, true);
+    }, admincmd);
 }
-void Telnet::registerCommand_comp() {
+void Telnet::registerCommand_comp(bool admincmd) {
     devTelnetServer->onCommand("comp", "Manage components\r\n\r\ncomp", [&](AsyncClient* client, String* parameter) {
         String result;
         bool changed = false;
@@ -701,9 +701,9 @@ void Telnet::registerCommand_comp() {
             Settings.Save();
         }
         client->write(result.c_str());
-    }, true);
+    }, admincmd);
 }
-void Telnet::registerCommand_user() {
+void Telnet::registerCommand_user(bool admincmd) {
     devTelnetServer->onCommand("user", "Manage users\r\n\r\nuser", [&](AsyncClient* client, String* parameter) {
         String result;
         bool changed = false;
@@ -773,5 +773,5 @@ void Telnet::registerCommand_user() {
             Settings.Save();
         }
         client->write(result.c_str());
-    }, true);
+    }, admincmd);
 }
