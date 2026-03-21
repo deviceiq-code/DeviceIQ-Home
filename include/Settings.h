@@ -31,7 +31,7 @@ extern MQTT *devMQTT;
 #define PASS_PBKDF2_ITERATIONS  10000
 #define PASS_SALTLEN            16    // 128-bit salt
 #define PASS_HASHLEN            32    // SHA-256 size
-#define MAX_USERS               3
+#define MAX_USERS               10
 
 enum class UserReturn : uint8_t { OK = 0, UserExists, UserNotFound, MaxUsersReached, NoAdminRemaining, PasswordError, InvalidCredentials, Authenticated };
 
@@ -67,6 +67,12 @@ class users_t {
         UserReturn Authenticate(const String& username, const String& password, user_t** outUser = nullptr);
         UserReturn Find(const String& username, user_t** outUser = nullptr);
         bool IsAdmin(const String& username);
+
+        inline user_t* begin() { return pUsers; }
+        inline user_t* end() { return pUsers + userCount; }
+
+        inline const user_t* begin() const { return pUsers; }
+        inline const user_t* end() const { return pUsers + userCount; }
 };
 
 class settings_t {

@@ -14,14 +14,14 @@ AsyncTelnetServer::AsyncTelnetServer(uint16_t port) : mPort(port) {
     onCommand(ASYNCTELNETSERVER_CMD_SESSIONS, ASYNCTELNETSERVER_HLP_SESSIONS, [&](AsyncClient* client, String* parameter) {
         client->write("Current sessions:\r\n\r\n");
         for (AsyncTelnetSession* session : mSessions) {
-            client->write(String(session->User + "@" + session->RemoteIP.toString() + ":" + String(session->RemotePort) + "\r\n").c_str());
+            client->write(String(session->User + "@" + session->RemoteIP.toString() + ":" + String(session->RemotePort) + String(session->Admin ? " - Admin" : "") + "\r\n").c_str());
         }
     });
 
     onCommand(ASYNCTELNETSERVER_CMD_WHOAMI, ASYNCTELNETSERVER_HLP_WHOAMI, [&](AsyncClient* client, String* parameter) {
         AsyncTelnetSession* session = CurrentSession(client);
         if (session != nullptr) {
-            client->write(String(session->User + "@" + client->remoteIP().toString() + ":" + String(client->remotePort()) + "\r\n").c_str());
+            client->write(String(session->User + "@" + session->RemoteIP.toString() + ":" + String(session->RemotePort) + String(session->Admin ? " - Admin" : "") + "\r\n").c_str());
         } else {
             client->write("Unknown session\r\n");
         }

@@ -26,6 +26,7 @@ void Telnet::Begin() {
         registerCommand_webserver();
         registerCommand_mqtt();
         registerCommand_comp();
+        registerCommand_user();
         
         devTelnetServer->begin();
         devLog->Write("Telnet Server: Enabled on port " + String(Settings.TelnetServer.Port()), LOGLEVEL_INFO);
@@ -66,7 +67,6 @@ void Telnet::registerCommand_logon() {
                 case UserReturn::UserNotFound : {
                     result += "Logon          | Logon failed for user " + parameter[0] + " - user not found.\r\n";
                     devLog->Write("Telnet Server: Logon failed for " + parameter[0] + "@" + client->remoteIP().toString() + ":" + String(client->remotePort()) + " - User not found", LOGLEVEL_WARNING);
-                    return;
                 }
                 break;
             
@@ -543,7 +543,7 @@ void Telnet::registerCommand_comp() {
         bool changed = false;
 
         if (parameter[0].equalsIgnoreCase("list")) {
-            result += "Components     | Count: " + String(Settings.Components.Count()) + "\r\n";
+            result += "Components     | Count: " + String(Settings.Components.Count()) + "\r\n\r\n";
             for (auto m : Settings.Components) {
                 result += "               | " + EnumToString(AvailableComponentClasses, m->Class()) + ": " + m->Name() + "\r\n";
             }
@@ -662,6 +662,40 @@ void Telnet::registerCommand_comp() {
             }
         } else {
             result += "Components     | Invalid comp parameter.\r\n";
+        }
+
+        if (changed) {
+            result += "\r\n               | Settings changed - you must reboot to apply changes.\r\n";
+            Settings.Save();
+        }
+        client->write(result.c_str());
+    }, true);
+}
+void Telnet::registerCommand_user() {
+    devTelnetServer->onCommand("user", "Manage users\r\n\r\nuser", [&](AsyncClient* client, String* parameter) {
+        String result;
+        bool changed = false;
+
+        if (parameter[0].equalsIgnoreCase("list")) {
+            bool first = true;
+            for (auto m : Settings.Users) {
+                result += String(first ? "Users          | " : "               | ") + LimitString(m.Username(), 30, true) + String(m.Admin() ? "- Admin" : "") + "\r\n";                
+                first = false;
+            }
+
+            result += "\r\n               | Max Users: " + String(MAX_USERS) + "\r\n";
+            result += "               | Current: " + String(Settings.Users.Count()) + " user(s), " + String(Settings.Users.CountAdmins()) + " admin(s)\r\n";
+        } else if (parameter[0].equalsIgnoreCase("remove")) {
+            if (!parameter[1].isEmpty()) {
+                if (Settings.Users.Remove(parameter[1]) != UserReturn::OK) {
+                    result += "Users          | User '" + parameter[1] + "' removed.\r\n";
+                    changed = true;
+                } else {
+                    result += "Users          | Error removing user '" + parameter[1] + "'.\r\n";
+                }
+            }
+        } else {
+            result += "Users          | Invalid user parameter.\r\n";
         }
 
         if (changed) {

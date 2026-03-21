@@ -19,6 +19,11 @@ void setup() {
     // Settings
     Settings.Load();
     Settings.Users.Add("a", "a", true);
+    Settings.Users.Add("admin", "sym7821", true);
+    Settings.Users.Add("user", "sym7821", false);
+    Settings.Users.Add("helena", "sym7821", false);
+    Settings.Users.Add("fernanda", "sym7821", false);
+    Settings.Users.Add("pepeu", "sym7821", true);
 
     // Clock
     devClock = new Clock();
