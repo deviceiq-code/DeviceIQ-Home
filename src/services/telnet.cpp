@@ -687,12 +687,50 @@ void Telnet::registerCommand_user() {
             result += "               | Current: " + String(Settings.Users.Count()) + " user(s), " + String(Settings.Users.CountAdmins()) + " admin(s)\r\n";
         } else if (parameter[0].equalsIgnoreCase("remove")) {
             if (!parameter[1].isEmpty()) {
-                if (Settings.Users.Remove(parameter[1]) != UserReturn::OK) {
+                if (Settings.Users.Remove(parameter[1]) == UserReturn::OK) {
                     result += "Users          | User '" + parameter[1] + "' removed.\r\n";
                     changed = true;
                 } else {
                     result += "Users          | Error removing user '" + parameter[1] + "'.\r\n";
                 }
+            }
+        } else if (parameter[0].equalsIgnoreCase("password")) {
+            if (!parameter[1].isEmpty() && !parameter[2].isEmpty()) {
+                String username = parameter[1];
+                String newpassword = parameter[2];
+
+                user_t* user = nullptr;
+
+                if (Settings.Users.Find(username, &user) == UserReturn::OK && user != nullptr) {
+                    if (user->SetPassword(newpassword)) {
+                        result += "Users          | Password updated for user '" + username + "'.\r\n";
+                        changed = true;
+                    } else {
+                        result += "Users          | Error setting password for user '" + username + "'.\r\n";
+                    }
+                } else {
+                    result += "Users          | User '" + username + "' not found.\r\n";
+                }
+            } else {
+                result += "Users          | Missing parameters.\r\n";
+                result += "               | Usage: user password <username> <newpassword>\r\n";
+            }
+        } else if (parameter[0].equalsIgnoreCase("add")) {
+            if (!parameter[1].isEmpty() && !parameter[2].isEmpty()) {
+                String username = parameter[1];
+                String password = parameter[2];
+                bool admin = (!parameter[3].isEmpty() && parameter[3].equalsIgnoreCase("admin"));
+
+                if (Settings.Users.Add(username, password, admin) == UserReturn::OK) {
+                    result += "Users          | User '" + username + "' added.\r\n";
+                    result += "               | Admin: " + String(admin ? "Yes" : "No") + "\r\n";
+                    changed = true;
+                } else {
+                    result += "Users          | Error adding user '" + username + "'.\r\n";
+                }
+            } else {
+                result += "Users          | Missing parameters.\r\n";
+                result += "               | Usage: user add <username> <password> [admin]\r\n";
             }
         } else {
             result += "Users          | Invalid user parameter.\r\n";

@@ -10,6 +10,16 @@
 #include <IPAddress.h>
 
 struct defaults_t {
+    struct users_t {
+        struct admin_t {
+            const char* Username = "admin";
+            const char* Password = "admin";
+        } Admin;
+        struct user_t {
+            const char* Username = "user";
+            const char* Password = "user";
+        } User;
+    } Users;
     struct log_t {
         const uint8_t Endpoint = 0b00000101; // Serial + File
         const uint8_t Level = 0b11111111; // All

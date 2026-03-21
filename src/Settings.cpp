@@ -63,16 +63,31 @@ bool user_t::Authenticate(const String& password) const {
 
 UserReturn users_t::Add(const String& username, const String& password, bool admin) {
     if (userCount >= MAX_USERS) return UserReturn::MaxUsersReached;
+    if (Find(username, nullptr) == UserReturn::OK) return UserReturn::AlreadyExists;
 
-    for (size_t i = 0; i < userCount; ++i) if (pUsers[i].Username() == username) return UserReturn::UserExists;
-
-    user_t& u = pUsers[userCount];
+    user_t& u = pUsers[userCount++];
     u.Username(username);
     u.Admin(admin);
-    
-    if (!u.SetPassword(password)) return UserReturn::PasswordError;
-    
-    userCount++;
+
+    if (!u.SetPassword(password)) {
+        --userCount;
+        return UserReturn::Error;
+    }
+
+    return UserReturn::OK;
+}
+
+UserReturn users_t::AddLoaded(const String& username, bool admin, const uint8_t* salt, const uint8_t* hash) {
+    if (userCount >= MAX_USERS) return UserReturn::MaxUsersReached;
+    if (Find(username, nullptr) == UserReturn::OK) return UserReturn::AlreadyExists;
+
+    user_t& u = pUsers[userCount++];
+    u.Username(username);
+    u.Admin(admin);
+
+    memcpy(u.Salt, salt, PASS_SALTLEN);
+    memcpy(u.Hash, hash, PASS_HASHLEN);
+
     return UserReturn::OK;
 }
 
@@ -694,6 +709,41 @@ bool settings_t::Load(const String& configfilename) noexcept {
         TelnetServer.Port((uint16_t)(tn["Port"] | Defaults.TelnetServer.Port));
     }
 
+    // Users
+    if (doc["Users"].is<JsonArrayConst>()) {
+        for (JsonObjectConst item : doc["Users"].as<JsonArrayConst>()) {
+            String username = item["Username"] | "";
+            bool admin = item["Admin"] | false;
+
+            uint8_t salt[PASS_SALTLEN] = {0};
+            uint8_t hash[PASS_HASHLEN] = {0};
+
+            if (item["Salt"].is<JsonArrayConst>()) {
+                size_t i = 0;
+                for (JsonVariantConst v : item["Salt"].as<JsonArrayConst>()) {
+                    if (i >= PASS_SALTLEN) break;
+                    salt[i++] = v.as<uint8_t>();
+                }
+            }
+
+            if (item["Hash"].is<JsonArrayConst>()) {
+                size_t i = 0;
+                for (JsonVariantConst v : item["Hash"].as<JsonArrayConst>()) {
+                    if (i >= PASS_HASHLEN) break;
+                    hash[i++] = v.as<uint8_t>();
+                }
+            }
+
+            Users.AddLoaded(username, admin, salt, hash);
+        }
+    }
+
+    if (Users.Count() == 0) {
+        Users.Add(Defaults.Users.Admin.Username, Defaults.Users.Admin.Password, true);
+        Users.Add(Defaults.Users.User.Username, Defaults.Users.User.Password, false);
+        Save();
+    }
+
     return true;
 }
 
@@ -1067,7 +1117,7 @@ bool settings_t::Save(const String& configfilename) const noexcept {
     }
 
     JsonDocument doc;
-
+    
     // Log
     {
         JsonObject log = doc["Log"].to<JsonObject>();
@@ -1199,6 +1249,28 @@ bool settings_t::Save(const String& configfilename) const noexcept {
 
             if (m->Class() == CLASS_RELAY) {
                 item["State"] = m->as<Relay>()->State();
+            }
+        }
+    }
+
+    // Users
+    {
+        JsonArray users = doc["Users"].to<JsonArray>();
+
+        for (const auto& u : Settings.Users) {
+            JsonObject item = users.add<JsonObject>();
+
+            item["Username"] = u.Username();
+            item["Admin"] = u.Admin();
+
+            JsonArray salt = item["Salt"].to<JsonArray>();
+            for (size_t i = 0; i < PASS_SALTLEN; ++i) {
+                salt.add(u.Salt[i]);
+            }
+
+            JsonArray hash = item["Hash"].to<JsonArray>();
+            for (size_t i = 0; i < PASS_HASHLEN; ++i) {
+                hash.add(u.Hash[i]);
             }
         }
     }
