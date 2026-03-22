@@ -26,8 +26,8 @@ void Telnet::Begin() {
         registerCommand_telnet();
         registerCommand_webserver();
         registerCommand_mqtt();
-        registerCommand_comp();
         registerCommand_user();
+        registerCommand_comp();
         
         devTelnetServer->begin();
         devLog->Write("Telnet Server: Enabled on port " + String(Settings.TelnetServer.Port()), LOGLEVEL_INFO);
@@ -569,16 +569,103 @@ void Telnet::registerCommand_mqtt(bool admincmd) {
         client->write(result.c_str());
     }, admincmd);
 }
+void Telnet::registerCommand_user(bool admincmd) {
+    devTelnetServer->onCommand("user", "Manage users\r\n\r\nuser", [&](AsyncClient* client, String* parameter) {
+        String result;
+        bool changed = false;
+
+        if (parameter[0].equalsIgnoreCase("list")) {
+            bool first = true;
+            for (auto m : Settings.Users) {
+                result += String(first ? "Users          | " : "               | ") + LimitString(m.Username(), 30, true) + String(m.Admin() ? "- Admin" : "") + "\r\n";                
+                first = false;
+            }
+
+            result += "\r\n               | Max Users: " + String(MAX_USERS) + "\r\n";
+            result += "               | Current: " + String(Settings.Users.Count()) + " user(s), " + String(Settings.Users.CountAdmins()) + " admin(s)\r\n";
+        } else if (parameter[0].equalsIgnoreCase("remove")) {
+            if (!parameter[1].isEmpty()) {
+                if (Settings.Users.Remove(parameter[1]) == UserReturn::OK) {
+                    result += "Users          | User '" + parameter[1] + "' removed.\r\n";
+                    changed = true;
+                } else {
+                    result += "Users          | Error removing user '" + parameter[1] + "'.\r\n";
+                }
+            }
+        } else if (parameter[0].equalsIgnoreCase("password")) {
+            if (!parameter[1].isEmpty() && !parameter[2].isEmpty()) {
+                String username = parameter[1];
+                String newpassword = parameter[2];
+
+                user_t* user = nullptr;
+
+                if (Settings.Users.Find(username, &user) == UserReturn::OK && user != nullptr) {
+                    if (user->SetPassword(newpassword)) {
+                        result += "Users          | Password updated for user '" + username + "'.\r\n";
+                        changed = true;
+                    } else {
+                        result += "Users          | Error setting password for user '" + username + "'.\r\n";
+                    }
+                } else {
+                    result += "Users          | User '" + username + "' not found.\r\n";
+                }
+            } else {
+                result += "Users          | Missing parameters.\r\n";
+                result += "               | Usage: user password <username> <newpassword>\r\n";
+            }
+        } else if (parameter[0].equalsIgnoreCase("add")) {
+            if (!parameter[1].isEmpty() && !parameter[2].isEmpty()) {
+                String username = parameter[1];
+                String password = parameter[2];
+                bool admin = (!parameter[3].isEmpty() && parameter[3].equalsIgnoreCase("admin"));
+
+                if (Settings.Users.Add(username, password, admin) == UserReturn::OK) {
+                    result += "Users          | User '" + username + "' added.\r\n";
+                    result += "               | Admin: " + String(admin ? "Yes" : "No") + "\r\n";
+                    changed = true;
+                } else {
+                    result += "Users          | Error adding user '" + username + "'.\r\n";
+                }
+            } else {
+                result += "Users          | Missing parameters.\r\n";
+                result += "               | Usage: user add <username> <password> [admin]\r\n";
+            }
+        } else {
+            result += "Users          | Invalid user parameter.\r\n";
+        }
+
+        if (changed) {
+            result += "\r\n               | Settings changed - you must reboot to apply changes.\r\n";
+            Settings.Save();
+        }
+        client->write(result.c_str());
+    }, admincmd);
+}
 void Telnet::registerCommand_comp(bool admincmd) {
     devTelnetServer->onCommand("comp", "Manage components\r\n\r\ncomp", [&](AsyncClient* client, String* parameter) {
         String result;
         bool changed = false;
 
         if (parameter[0].equalsIgnoreCase("list")) {
-            result += "Components     | Count: " + String(Settings.Components.Count()) + "\r\n\r\n";
-            for (auto m : Settings.Components) {
-                result += "               | " + EnumToString(AvailableComponentClasses, m->Class()) + ": " + m->Name() + "\r\n";
+            result += "Components     | Listing total of " + String(Settings.Components.Count()) + " component(s)\r\n";
+
+            uint8_t mComponent_Count = 0;
+            for (auto mClass : AvailableComponentClasses) {
+                mComponent_Count = 0;
+                bool first = true;
+
+                for (auto* mComponent : Settings.Components) {
+                    if (mComponent->Class() == mClass.second) {
+                        result += "\r\n" + (first ? LimitString(mClass.first, 15, true) : "               ") + "| ";
+                        result += mComponent->Name() + " - ";
+                        first = false;
+                        mComponent_Count++;
+                    }
+                }
+
+                if (mComponent_Count > 0) result += "\r\n               | Count: " + String(mComponent_Count) + "\r\n";
             }
+
         } else if (parameter[0].equalsIgnoreCase("bus")) {
             result += "Buses          | Count: " + String(AvailableComponentBuses.size()) + "\r\n\r\n";
             for (auto m : AvailableComponentBuses) {
@@ -694,78 +781,6 @@ void Telnet::registerCommand_comp(bool admincmd) {
             }
         } else {
             result += "Components     | Invalid comp parameter.\r\n";
-        }
-
-        if (changed) {
-            result += "\r\n               | Settings changed - you must reboot to apply changes.\r\n";
-            Settings.Save();
-        }
-        client->write(result.c_str());
-    }, admincmd);
-}
-void Telnet::registerCommand_user(bool admincmd) {
-    devTelnetServer->onCommand("user", "Manage users\r\n\r\nuser", [&](AsyncClient* client, String* parameter) {
-        String result;
-        bool changed = false;
-
-        if (parameter[0].equalsIgnoreCase("list")) {
-            bool first = true;
-            for (auto m : Settings.Users) {
-                result += String(first ? "Users          | " : "               | ") + LimitString(m.Username(), 30, true) + String(m.Admin() ? "- Admin" : "") + "\r\n";                
-                first = false;
-            }
-
-            result += "\r\n               | Max Users: " + String(MAX_USERS) + "\r\n";
-            result += "               | Current: " + String(Settings.Users.Count()) + " user(s), " + String(Settings.Users.CountAdmins()) + " admin(s)\r\n";
-        } else if (parameter[0].equalsIgnoreCase("remove")) {
-            if (!parameter[1].isEmpty()) {
-                if (Settings.Users.Remove(parameter[1]) == UserReturn::OK) {
-                    result += "Users          | User '" + parameter[1] + "' removed.\r\n";
-                    changed = true;
-                } else {
-                    result += "Users          | Error removing user '" + parameter[1] + "'.\r\n";
-                }
-            }
-        } else if (parameter[0].equalsIgnoreCase("password")) {
-            if (!parameter[1].isEmpty() && !parameter[2].isEmpty()) {
-                String username = parameter[1];
-                String newpassword = parameter[2];
-
-                user_t* user = nullptr;
-
-                if (Settings.Users.Find(username, &user) == UserReturn::OK && user != nullptr) {
-                    if (user->SetPassword(newpassword)) {
-                        result += "Users          | Password updated for user '" + username + "'.\r\n";
-                        changed = true;
-                    } else {
-                        result += "Users          | Error setting password for user '" + username + "'.\r\n";
-                    }
-                } else {
-                    result += "Users          | User '" + username + "' not found.\r\n";
-                }
-            } else {
-                result += "Users          | Missing parameters.\r\n";
-                result += "               | Usage: user password <username> <newpassword>\r\n";
-            }
-        } else if (parameter[0].equalsIgnoreCase("add")) {
-            if (!parameter[1].isEmpty() && !parameter[2].isEmpty()) {
-                String username = parameter[1];
-                String password = parameter[2];
-                bool admin = (!parameter[3].isEmpty() && parameter[3].equalsIgnoreCase("admin"));
-
-                if (Settings.Users.Add(username, password, admin) == UserReturn::OK) {
-                    result += "Users          | User '" + username + "' added.\r\n";
-                    result += "               | Admin: " + String(admin ? "Yes" : "No") + "\r\n";
-                    changed = true;
-                } else {
-                    result += "Users          | Error adding user '" + username + "'.\r\n";
-                }
-            } else {
-                result += "Users          | Missing parameters.\r\n";
-                result += "               | Usage: user add <username> <password> [admin]\r\n";
-            }
-        } else {
-            result += "Users          | Invalid user parameter.\r\n";
         }
 
         if (changed) {
