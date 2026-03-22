@@ -657,7 +657,7 @@ void Telnet::registerCommand_comp(bool admincmd) {
                 for (auto* mComponent : Settings.Components) {
                     if (mComponent->Class() == mClass.second) {
                         result += "\r\n" + (first ? LimitString(mClass.first, 15, true) : "               ") + "| ";
-                        result += mComponent->Name() + " - ";
+                        result += "[" + String(mComponent->ID()) + "] " + mComponent->Name() + " - " + BusToString(mComponent->Bus()) + ":" + String(mComponent->Address()) + (mComponent->Enabled() ? "" : " (Disabled)");
                         first = false;
                         mComponent_Count++;
                     }
@@ -696,6 +696,7 @@ void Telnet::registerCommand_comp(bool admincmd) {
                     String comp_bus = parameter[3];
                     uint8_t comp_address = parameter[4].toInt();
                     String comp_option = parameter[5];
+                    bool comp_enabled = parameter[6].isEmpty() ? true : parameter[6].equalsIgnoreCase("true");
 
                     bool added = false;
                     
@@ -764,6 +765,8 @@ void Telnet::registerCommand_comp(bool admincmd) {
                             }
 
                             if (added) {
+                                NewComponent->Enabled(comp_enabled);
+                                
                                 Settings.Components.Add(NewComponent);
                                 changed = true;
 
