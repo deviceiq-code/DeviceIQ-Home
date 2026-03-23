@@ -665,7 +665,6 @@ void Telnet::registerCommand_comp(bool admincmd) {
 
                 if (mComponent_Count > 0) result += "\r\n               | Count: " + String(mComponent_Count) + "\r\n";
             }
-
         } else if (parameter[0].equalsIgnoreCase("bus")) {
             result += "Buses          | Count: " + String(AvailableComponentBuses.size()) + "\r\n\r\n";
             for (auto m : AvailableComponentBuses) {
@@ -766,14 +765,16 @@ void Telnet::registerCommand_comp(bool admincmd) {
 
                             if (added) {
                                 NewComponent->Enabled(comp_enabled);
-                                
-                                Settings.Components.Add(NewComponent);
-                                changed = true;
 
-                                result += "Components     | New component '" + comp_name + "' added\r\n";
-                                result += "               | Class: " + comp_class + "\r\n";
-                            } else {
-                                result += "Components     | Error while adding component '" + comp_name + "'.\r\n";
+                                if (Settings.Components.Add(NewComponent)) {
+                                    changed = true;
+
+                                    result += "Components     | New component '" + comp_name + "' added\r\n";
+                                    result += "               | Class: " + comp_class + "\r\n";
+                                } else {
+                                    delete NewComponent;
+                                    result += "Components     | Error while adding component '" + comp_name + "'.\r\n";
+                                }
                             }
                         }
                     }
