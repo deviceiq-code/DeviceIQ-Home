@@ -187,7 +187,7 @@ void Telnet::registerCommand_network(bool admincmd) {
         }
         
         if (changed) {
-            result += "\r\n               | Settings changed - you must reboot to apply changes.\r\n";
+            result += "\r\n               | Settings changed - reboot recommended to apply changes.\r\n";
             Settings.Save();
         }
         client->write(result.c_str());
@@ -225,7 +225,7 @@ void Telnet::registerCommand_ntp(bool admincmd) {
         }
         
         if (changed) {
-            result += "\r\n               | Settings changed - you must reboot to apply changes.\r\n";
+            result += "\r\n               | Settings changed - reboot recommended to apply changes.\r\n";
             Settings.Save();
         }
         client->write(result.c_str());
@@ -457,7 +457,7 @@ void Telnet::registerCommand_telnet(bool admincmd) {
         }
 
         if (changed) {
-            result += "\r\n               | Settings changed - you must reboot to apply changes.\r\n";
+            result += "\r\n               | Settings changed - reboot recommended to apply changes.\r\n";
             Settings.Save();
         }
         client->write(result.c_str());
@@ -503,7 +503,7 @@ void Telnet::registerCommand_webserver(bool admincmd) {
         }
 
         if (changed) {
-            result += "\r\n               | Settings changed - you must reboot to apply changes.\r\n";
+            result += "\r\n               | Settings changed - reboot recommended to apply changes.\r\n";
             Settings.Save();
         }
         client->write(result.c_str());
@@ -563,7 +563,7 @@ void Telnet::registerCommand_mqtt(bool admincmd) {
         }
 
         if (changed) {
-            result += "\r\n               | Settings changed - you must reboot to apply changes.\r\n";
+            result += "\r\n               | Settings changed - reboot recommended to apply changes.\r\n";
             Settings.Save();
         }
         client->write(result.c_str());
@@ -635,7 +635,7 @@ void Telnet::registerCommand_user(bool admincmd) {
         }
 
         if (changed) {
-            result += "\r\n               | Settings changed - you must reboot to apply changes.\r\n";
+            result += "\r\n               | Settings changed - reboot recommended to apply changes.\r\n";
             Settings.Save();
         }
         client->write(result.c_str());
@@ -685,95 +685,190 @@ void Telnet::registerCommand_comp(bool admincmd) {
                 }
             }
         } else if (parameter[0].equalsIgnoreCase("add")) {
-            if (!parameter[1].isEmpty() && !parameter[2].isEmpty() && !parameter[3].isEmpty() && !parameter[4].isEmpty() && !parameter[5].isEmpty()) {
+            if (!parameter[1].isEmpty() && !parameter[2].isEmpty() && !parameter[3].isEmpty()) {
                 String comp_name = parameter[1];
 
                 if (Settings.Components.IndexOf(comp_name) != -1) {
                     result += "Components     | Component '" + comp_name + "' already exists.\r\n";
                 } else {
-                    String comp_class = parameter[2];
-                    String comp_bus = parameter[3];
-                    uint8_t comp_address = parameter[4].toInt();
-                    String comp_option = parameter[5];
-                    bool comp_enabled = parameter[6].isEmpty() ? true : parameter[6].equalsIgnoreCase("true");
+                    String comp_class   = parameter[2];
+                    String comp_busaddr = parameter[3];
+                    String comp_option  = parameter[4];
+                    bool comp_enabled   = parameter[5].isEmpty() ? true : parameter[5].equalsIgnoreCase("true");
 
-                    bool added = false;
-                    
-                    Generic *NewComponent = nullptr;
-
-                    auto it_class = AvailableComponentClasses.find(comp_class);
-                    if (it_class == AvailableComponentClasses.end()) {
-                        result += "Components     | Invalid class '" + comp_class + "'.\r\n";
+                    int sep = comp_busaddr.indexOf(':');
+                    if (sep <= 0 || sep >= (int)comp_busaddr.length() - 1) {
+                        result += "Components     | Invalid bus/address '" + comp_busaddr + "'.\r\n";
+                        result += "               | Usage: <bus>:<address>\r\n";
                     } else {
-                        Classes c = it_class->second;
+                        String comp_bus = comp_busaddr.substring(0, sep);
+                        String comp_addr_str = comp_busaddr.substring(sep + 1);
 
-                        auto it_bus = AvailableComponentBuses.find(comp_bus);
-                        if (it_bus == AvailableComponentBuses.end()) {
-                            result += "Components     | Invalid bus '" + comp_bus + "'.\r\n";
-                        } else {
-                            switch (c) {
-                                case CLASS_BLINDS: {
-
-                                } break;
-
-                                case CLASS_BUTTON: {
-                                    NewComponent = new Button(comp_name, Settings.Components.Count() + 1, AvailableComponentBuses.at(comp_bus), comp_address, (comp_option.equalsIgnoreCase("EdgesOnly") ? ButtonReportModes::BUTTONREPORTMODE_EDGESONLY : ButtonReportModes::BUTTONREPORTMODE_CLICKSONLY));
-                                    added = true;
-                                } break;
-
-                                case CLASS_CONTACTSENSOR: {
-                                    NewComponent = new ContactSensor(comp_name, Settings.Components.Count() + 1, AvailableComponentBuses.at(comp_bus), comp_address, (comp_option.equalsIgnoreCase("Invert") ? true : false));
-                                    added = true;
-                                } break;
-
-                                case CLASS_CURRENTMETER: {
-                                    NewComponent = new Currentmeter(comp_name, Settings.Components.Count() + 1, AvailableComponentBuses.at(comp_bus), comp_address);
-                                    added = true;
-                                } break;
-
-                                case CLASS_DOORBELL: {
-                                    NewComponent = new Doorbell(comp_name, Settings.Components.Count() + 1, AvailableComponentBuses.at(comp_bus), comp_address);
-                                    added = true;
-                                } break;
-
-                                case CLASS_PIR: {
-                                    NewComponent = new PIR(comp_name, Settings.Components.Count() + 1, AvailableComponentBuses.at(comp_bus), comp_address);
-                                    added = true;
-                                } break;
-
-                                case CLASS_RELAY: {
-                                    NewComponent = new Relay(comp_name, Settings.Components.Count() + 1, AvailableComponentBuses.at(comp_bus), comp_address, (comp_option.equalsIgnoreCase("NormallyOpened") ? RelayTypes::RELAYTYPE_NORMALLYOPENED : RelayTypes::RELAYTYPE_NORMALLYCLOSED));
-                                    added = true;
-                                } break;
-
-                                case CLASS_THERMOMETER: {
-                                    ThermometerTypes comp_type = THERMOMETERTYPE_DHT11;
-
-                                    if (comp_option.equalsIgnoreCase("DHT11")) comp_type = THERMOMETERTYPE_DHT11;
-                                    else if (comp_option.equalsIgnoreCase("DHT12")) comp_type = THERMOMETERTYPE_DHT12;
-                                    else if (comp_option.equalsIgnoreCase("DHT21")) comp_type = THERMOMETERTYPE_DHT21;
-                                    else if (comp_option.equalsIgnoreCase("DHT22")) comp_type = THERMOMETERTYPE_DHT22;
-                                    else if (comp_option.equalsIgnoreCase("DS18B20")) comp_type = THERMOMETERTYPE_DS18B20;
-
-                                    NewComponent = new Thermometer(comp_name, Settings.Components.Count() + 1, AvailableComponentBuses.at(comp_bus), comp_address, comp_type);
-                                    added = true;
-                                } break;
-
-                                default:
-                                    break;
+                        bool valid_number = true;
+                        for (size_t i = 0; i < comp_addr_str.length(); ++i) {
+                            if (!isDigit(comp_addr_str[i])) {
+                                valid_number = false;
+                                break;
                             }
+                        }
 
-                            if (added) {
-                                NewComponent->Enabled(comp_enabled);
+                        if (comp_addr_str.isEmpty() || !valid_number) {
+                            result += "Components     | Invalid address '" + comp_addr_str + "'.\r\n";
+                        } else {
+                            uint8_t comp_address = (uint8_t)comp_addr_str.toInt();
 
-                                if (Settings.Components.Add(NewComponent)) {
-                                    changed = true;
-
-                                    result += "Components     | New component '" + comp_name + "' added\r\n";
-                                    result += "               | Class: " + comp_class + "\r\n";
+                            auto it_class = AvailableComponentClasses.find(comp_class);
+                            if (it_class == AvailableComponentClasses.end()) {
+                                result += "Components     | Invalid class '" + comp_class + "'.\r\n";
+                            } else {
+                                auto it_bus = AvailableComponentBuses.find(comp_bus);
+                                if (it_bus == AvailableComponentBuses.end()) {
+                                    result += "Components     | Invalid bus '" + comp_bus + "'.\r\n";
                                 } else {
-                                    delete NewComponent;
-                                    result += "Components     | Error while adding component '" + comp_name + "'.\r\n";
+                                    Buses bus_type = it_bus->second;
+
+                                    bool busaddr_in_use = false;
+                                    for (size_t i = 0; i < Settings.Components.Count(); ++i) {
+                                        Generic* existing = Settings.Components[i];
+                                        if (existing == nullptr) continue;
+
+                                        switch (existing->Class()) {
+                                            case CLASS_GENERIC:
+                                            case CLASS_BLINDS:
+                                                break;
+
+                                            default:
+                                                if ((existing->Bus() == bus_type) && (existing->Address() == comp_address)) {
+                                                    busaddr_in_use = true;
+                                                }
+                                                break;
+                                        }
+
+                                        if (busaddr_in_use) break;
+                                    }
+
+                                    if (busaddr_in_use) {
+                                        result += "Components     | Bus/address '" + comp_bus + ":" + String(comp_address) + "' already in use.\r\n";
+                                    } else {
+                                        Classes c = it_class->second;
+                                        bool added = false;
+                                        Generic* NewComponent = nullptr;
+
+                                        switch (c) {
+                                            case CLASS_BLINDS: {
+
+                                            } break;
+
+                                            case CLASS_BUTTON: {
+                                                NewComponent = new Button(
+                                                    comp_name,
+                                                    Settings.Components.Count() + 1,
+                                                    bus_type,
+                                                    comp_address,
+                                                    comp_option.equalsIgnoreCase("EdgesOnly")
+                                                        ? ButtonReportModes::BUTTONREPORTMODE_EDGESONLY
+                                                        : ButtonReportModes::BUTTONREPORTMODE_CLICKSONLY
+                                                );
+                                                added = true;
+                                            } break;
+
+                                            case CLASS_CONTACTSENSOR: {
+                                                NewComponent = new ContactSensor(
+                                                    comp_name,
+                                                    Settings.Components.Count() + 1,
+                                                    bus_type,
+                                                    comp_address,
+                                                    comp_option.equalsIgnoreCase("Invert")
+                                                );
+                                                added = true;
+                                            } break;
+
+                                            case CLASS_CURRENTMETER: {
+                                                NewComponent = new Currentmeter(
+                                                    comp_name,
+                                                    Settings.Components.Count() + 1,
+                                                    bus_type,
+                                                    comp_address
+                                                );
+                                                added = true;
+                                            } break;
+
+                                            case CLASS_DOORBELL: {
+                                                NewComponent = new Doorbell(
+                                                    comp_name,
+                                                    Settings.Components.Count() + 1,
+                                                    bus_type,
+                                                    comp_address
+                                                );
+                                                added = true;
+                                            } break;
+
+                                            case CLASS_PIR: {
+                                                NewComponent = new PIR(
+                                                    comp_name,
+                                                    Settings.Components.Count() + 1,
+                                                    bus_type,
+                                                    comp_address
+                                                );
+                                                added = true;
+                                            } break;
+
+                                            case CLASS_RELAY: {
+                                                NewComponent = new Relay(
+                                                    comp_name,
+                                                    Settings.Components.Count() + 1,
+                                                    bus_type,
+                                                    comp_address,
+                                                    comp_option.equalsIgnoreCase("NormallyOpened")
+                                                        ? RelayTypes::RELAYTYPE_NORMALLYOPENED
+                                                        : RelayTypes::RELAYTYPE_NORMALLYCLOSED
+                                                );
+                                                added = true;
+                                            } break;
+
+                                            case CLASS_THERMOMETER: {
+                                                ThermometerTypes comp_type = THERMOMETERTYPE_DHT11;
+
+                                                if (comp_option.equalsIgnoreCase("DHT11")) comp_type = THERMOMETERTYPE_DHT11;
+                                                else if (comp_option.equalsIgnoreCase("DHT12")) comp_type = THERMOMETERTYPE_DHT12;
+                                                else if (comp_option.equalsIgnoreCase("DHT21")) comp_type = THERMOMETERTYPE_DHT21;
+                                                else if (comp_option.equalsIgnoreCase("DHT22")) comp_type = THERMOMETERTYPE_DHT22;
+                                                else if (comp_option.equalsIgnoreCase("DS18B20")) comp_type = THERMOMETERTYPE_DS18B20;
+
+                                                NewComponent = new Thermometer(
+                                                    comp_name,
+                                                    Settings.Components.Count() + 1,
+                                                    bus_type,
+                                                    comp_address,
+                                                    comp_type
+                                                );
+                                                added = true;
+                                            } break;
+
+                                            default:
+                                                break;
+                                        }
+
+                                        if (added) {
+                                            if (Settings.Components.Add(NewComponent)) {
+                                                NewComponent->Enabled(comp_enabled);
+                                                changed = true;
+
+                                                result += "Components     | New component '" + comp_name + "' added\r\n";
+                                                result += "               | Class: " + comp_class + "\r\n";
+                                                result += "               | Bus: " + comp_bus + "\r\n";
+                                                result += "               | Address: " + String(comp_address) + "\r\n";
+                                                if (!comp_option.isEmpty())
+                                                    result += "               | Option: " + comp_option + "\r\n";
+                                                result += "               | Enabled: " + String(comp_enabled ? "true" : "false") + "\r\n";
+                                            } else {
+                                                delete NewComponent;
+                                                result += "Components     | Error while adding component '" + comp_name + "'.\r\n";
+                                            }
+                                        } else {
+                                            result += "Components     | Error while creating component '" + comp_name + "'.\r\n";
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -781,14 +876,14 @@ void Telnet::registerCommand_comp(bool admincmd) {
                 }
             } else {
                 result += "Components     | Missing new component parameters.\r\n";
-                result += "               | comp add [name] [class] [bus] [address] [options]\r\n";
+                result += "               | Usage: comp add <name> <class> <bus>:<address> [option] [enabled]\r\n";
             }
         } else {
             result += "Components     | Invalid comp parameter.\r\n";
         }
 
         if (changed) {
-            result += "\r\n               | Settings changed - you must reboot to apply changes.\r\n";
+            result += "\r\n               | Settings changed - reboot recommended to apply changes.\r\n";
             Settings.Save();
         }
         client->write(result.c_str());
