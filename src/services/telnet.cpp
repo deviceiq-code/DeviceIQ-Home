@@ -685,24 +685,26 @@ void Telnet::registerCommand_comp(bool admincmd) {
                 }
             }
         } else if (parameter[0].equalsIgnoreCase("add")) {
-            if (!parameter[1].isEmpty() && !parameter[2].isEmpty() && !parameter[3].isEmpty()) {
+            if (!parameter[1].isEmpty() && !parameter[2].isEmpty()) {
                 String comp_name = parameter[1];
 
                 if (Settings.Components.IndexOf(comp_name) != -1) {
                     result += "Components     | Component '" + comp_name + "' already exists.\r\n";
                 } else {
-                    String comp_class   = parameter[2];
-                    String comp_busaddr = parameter[3];
-                    String comp_option  = parameter[4];
-                    bool comp_enabled   = parameter[5].isEmpty() ? true : parameter[5].equalsIgnoreCase("true");
+                    String comp_target = parameter[2];
+                    String comp_option = parameter[3];
+                    bool comp_enabled = parameter[4].isEmpty() ? true : parameter[4].equalsIgnoreCase("true");
 
-                    int sep = comp_busaddr.indexOf(':');
-                    if (sep <= 0 || sep >= (int)comp_busaddr.length() - 1) {
-                        result += "Components     | Invalid bus/address '" + comp_busaddr + "'.\r\n";
-                        result += "               | Usage: <bus>:<address>\r\n";
+                    int at = comp_target.indexOf('@');
+                    int sep = comp_target.indexOf(':');
+
+                    if (at <= 0 || sep <= (at + 1) || sep >= (int)comp_target.length() - 1) {
+                        result += "Components     | Invalid component target '" + comp_target + "'.\r\n";
+                        result += "               | Usage: <class>@<bus>:<address>\r\n";
                     } else {
-                        String comp_bus = comp_busaddr.substring(0, sep);
-                        String comp_addr_str = comp_busaddr.substring(sep + 1);
+                        String comp_class = comp_target.substring(0, at);
+                        String comp_bus = comp_target.substring(at + 1, sep);
+                        String comp_addr_str = comp_target.substring(sep + 1);
 
                         bool valid_number = true;
                         for (size_t i = 0; i < comp_addr_str.length(); ++i) {
@@ -760,69 +762,32 @@ void Telnet::registerCommand_comp(bool admincmd) {
                                             } break;
 
                                             case CLASS_BUTTON: {
-                                                NewComponent = new Button(
-                                                    comp_name,
-                                                    Settings.Components.Count() + 1,
-                                                    bus_type,
-                                                    comp_address,
-                                                    comp_option.equalsIgnoreCase("EdgesOnly")
-                                                        ? ButtonReportModes::BUTTONREPORTMODE_EDGESONLY
-                                                        : ButtonReportModes::BUTTONREPORTMODE_CLICKSONLY
-                                                );
+                                                NewComponent = new Button(comp_name, Settings.Components.Count() + 1, bus_type, comp_address, comp_option.equalsIgnoreCase("EdgesOnly") ? ButtonReportModes::BUTTONREPORTMODE_EDGESONLY : ButtonReportModes::BUTTONREPORTMODE_CLICKSONLY);
                                                 added = true;
                                             } break;
 
                                             case CLASS_CONTACTSENSOR: {
-                                                NewComponent = new ContactSensor(
-                                                    comp_name,
-                                                    Settings.Components.Count() + 1,
-                                                    bus_type,
-                                                    comp_address,
-                                                    comp_option.equalsIgnoreCase("Invert")
-                                                );
+                                                NewComponent = new ContactSensor(comp_name, Settings.Components.Count() + 1, bus_type, comp_address, comp_option.equalsIgnoreCase("Invert"));
                                                 added = true;
                                             } break;
 
                                             case CLASS_CURRENTMETER: {
-                                                NewComponent = new Currentmeter(
-                                                    comp_name,
-                                                    Settings.Components.Count() + 1,
-                                                    bus_type,
-                                                    comp_address
-                                                );
+                                                NewComponent = new Currentmeter(comp_name, Settings.Components.Count() + 1, bus_type, comp_address);
                                                 added = true;
                                             } break;
 
                                             case CLASS_DOORBELL: {
-                                                NewComponent = new Doorbell(
-                                                    comp_name,
-                                                    Settings.Components.Count() + 1,
-                                                    bus_type,
-                                                    comp_address
-                                                );
+                                                NewComponent = new Doorbell(comp_name, Settings.Components.Count() + 1, bus_type, comp_address);
                                                 added = true;
                                             } break;
 
                                             case CLASS_PIR: {
-                                                NewComponent = new PIR(
-                                                    comp_name,
-                                                    Settings.Components.Count() + 1,
-                                                    bus_type,
-                                                    comp_address
-                                                );
+                                                NewComponent = new PIR(comp_name, Settings.Components.Count() + 1, bus_type, comp_address);
                                                 added = true;
                                             } break;
 
                                             case CLASS_RELAY: {
-                                                NewComponent = new Relay(
-                                                    comp_name,
-                                                    Settings.Components.Count() + 1,
-                                                    bus_type,
-                                                    comp_address,
-                                                    comp_option.equalsIgnoreCase("NormallyOpened")
-                                                        ? RelayTypes::RELAYTYPE_NORMALLYOPENED
-                                                        : RelayTypes::RELAYTYPE_NORMALLYCLOSED
-                                                );
+                                                NewComponent = new Relay(comp_name, Settings.Components.Count() + 1, bus_type, comp_address, comp_option.equalsIgnoreCase("NormallyOpened") ? RelayTypes::RELAYTYPE_NORMALLYOPENED : RelayTypes::RELAYTYPE_NORMALLYCLOSED);
                                                 added = true;
                                             } break;
 
@@ -835,13 +800,7 @@ void Telnet::registerCommand_comp(bool admincmd) {
                                                 else if (comp_option.equalsIgnoreCase("DHT22")) comp_type = THERMOMETERTYPE_DHT22;
                                                 else if (comp_option.equalsIgnoreCase("DS18B20")) comp_type = THERMOMETERTYPE_DS18B20;
 
-                                                NewComponent = new Thermometer(
-                                                    comp_name,
-                                                    Settings.Components.Count() + 1,
-                                                    bus_type,
-                                                    comp_address,
-                                                    comp_type
-                                                );
+                                                NewComponent = new Thermometer(comp_name, Settings.Components.Count() + 1, bus_type, comp_address, comp_type);
                                                 added = true;
                                             } break;
 
@@ -876,7 +835,7 @@ void Telnet::registerCommand_comp(bool admincmd) {
                 }
             } else {
                 result += "Components     | Missing new component parameters.\r\n";
-                result += "               | Usage: comp add <name> <class> <bus>:<address> [option] [enabled]\r\n";
+                result += "               | Usage: comp add <name> <class>@<bus>:<address> [option] [enabled]\r\n";
             }
         } else {
             result += "Components     | Invalid comp parameter.\r\n";
