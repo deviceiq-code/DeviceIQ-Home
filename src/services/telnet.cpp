@@ -121,6 +121,7 @@ void Telnet::registerCommand_network(bool admincmd) {
 
         if (parameter[0].isEmpty()) {
             result += "Network        | " + LimitString("SSID: " + devNetwork->SSID(), 30, true) + LimitString(Settings.Network.SSID(), 30, true) + "\r\n";
+            result += "               | " + LimitString("PSK: " + devNetwork->Passphrase(), 30, true) + LimitString(Settings.Network.Passphrase(), 30, true) + "\r\n";
             result += "               | " + LimitString("Hostname: " + devNetwork->Hostname(), 30, true) + LimitString(Settings.Network.Hostname(), 30, true) + "\r\n";
             result += "               | " + LimitString("DHCP: " + String(devNetwork->DHCP_Client() ? "Yes" : "No"), 30, true) + LimitString(Settings.Network.DHCPClient() ? "Yes" : "No", 30, true) + "\r\n";
             result += "               | " + LimitString("IP: " + devNetwork->IP_Address().toString(), 30, true) + LimitString(Settings.Network.IP_Address().toString(), 30, true) + "\r\n";
@@ -136,6 +137,99 @@ void Telnet::registerCommand_network(bool admincmd) {
                     changed = true;
                 }
                 result += "Network        | " + LimitString("Hostname: " + devNetwork->Hostname(), 30, true) + LimitString(Settings.Network.Hostname(), 30, true) + "\r\n";
+            } else if (parameter[0].equalsIgnoreCase("scan")) {
+                result += "Network        | Scanning WiFi networks...\r\n";
+
+                int n = WiFi.scanNetworks();
+
+                if (n == 0) {
+                    result += "               | No networks found.\r\n";
+                } else {
+                    for (int i = 0; i < n; ++i) {
+                        String ssid = WiFi.SSID(i);
+                        int32_t rssi = WiFi.RSSI(i);
+                        int32_t ch = WiFi.channel(i);
+                        wifi_auth_mode_t enc = WiFi.encryptionType(i);
+
+                        String enc_str;
+                        switch (enc) {
+                            case WIFI_AUTH_OPEN: enc_str = "Open"; break;
+                            case WIFI_AUTH_WEP: enc_str = "WEP"; break;
+                            case WIFI_AUTH_WPA_PSK: enc_str = "WPA"; break;
+                            case WIFI_AUTH_WPA2_PSK: enc_str = "WPA2"; break;
+                            case WIFI_AUTH_WPA_WPA2_PSK: enc_str = "WPA/WPA2"; break;
+                            case WIFI_AUTH_WPA2_ENTERPRISE: enc_str = "WPA2-ENT"; break;
+                            case WIFI_AUTH_WPA3_PSK: enc_str = "WPA3"; break;
+                            case WIFI_AUTH_WPA2_WPA3_PSK: enc_str = "WPA2/WPA3"; break;
+                            default: enc_str = "?"; break;
+                        }
+
+                        result += "               | [" + String(i + 1) + "] ";
+                        result += LimitString(ssid, 20, true);
+                        result += " RSSI: " + String(rssi);
+                        result += " Ch: " + String(ch);
+                        result += " " + enc_str + "\r\n";
+                    }
+
+                    result += "               | Count: " + String(n) + "\r\n";
+                }
+
+                WiFi.scanDelete();
+            } else if (parameter[0].equalsIgnoreCase("wifi")) {
+                if (parameter[1].isEmpty()) {
+                    result += "Network        | " + LimitString("SSID: " + devNetwork->SSID(), 30, true) + LimitString(Settings.Network.SSID(), 30, true) + "\r\n";
+                    result += "               | " + LimitString("PSK: " + devNetwork->Passphrase(), 30, true) + LimitString(Settings.Network.Passphrase(), 30, true) + "\r\n";
+                } else {
+                    String wifi_param = parameter[1];
+
+                    int sep = wifi_param.indexOf(':');
+
+                    if (sep <= 0 || sep >= (int)wifi_param.length() - 1) {
+                        result += "Network        | Invalid format.\r\n";
+                        result += "               | Usage: network wifi <ssid>:<password>\r\n";
+                        result += "               |        network wifi \"SSID\":\"PASSWORD\"\r\n";
+                    } else {
+                        String ssid = wifi_param.substring(0, sep);
+                        String pass = wifi_param.substring(sep + 1);
+
+                        ssid.trim();
+                        pass.trim();
+
+                        // remove aspas se existirem
+                        if (ssid.startsWith("\"") && ssid.endsWith("\"") && ssid.length() >= 2) {
+                            ssid = ssid.substring(1, ssid.length() - 1);
+                        }
+
+                        if (pass.startsWith("\"") && pass.endsWith("\"") && pass.length() >= 2) {
+                            pass = pass.substring(1, pass.length() - 1);
+                        }
+
+                        if (ssid.isEmpty() || pass.isEmpty()) {
+                            result += "Network        | SSID or password cannot be empty.\r\n";
+                        } else {
+                            bool changed_local = false;
+
+                            if (!Settings.Network.SSID().equals(ssid)) {
+                                Settings.Network.SSID(ssid);
+                                changed_local = true;
+                            }
+
+                            if (!Settings.Network.Passphrase().equals(pass)) {
+                                Settings.Network.Passphrase(pass);
+                                changed_local = true;
+                            }
+
+                            result += "Network        | " + LimitString("SSID: " + devNetwork->SSID(), 30, true) + LimitString(Settings.Network.SSID(), 30, true) + "\r\n";
+                            result += "               | " + LimitString("PSK: " + devNetwork->Passphrase(), 30, true) + LimitString(Settings.Network.Passphrase(), 30, true) + "\r\n";
+
+                            if (changed_local) {
+                                result += "\r\n               | WiFi credentials updated - reboot required.\r\n";
+                                Settings.Save();
+                                changed = true;
+                            }
+                        }
+                    }
+                }
             } else if (parameter[0].equalsIgnoreCase("dhcp")) {
                 if (parameter[1].equalsIgnoreCase("true") || parameter[1].equalsIgnoreCase("on") || parameter[1].equalsIgnoreCase("yes")) {
                     if (!Settings.Network.DHCPClient()) {
