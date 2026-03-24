@@ -138,12 +138,19 @@ void Telnet::registerCommand_network(bool admincmd) {
                 }
                 result += "Network        | " + LimitString("Hostname: " + devNetwork->Hostname(), 30, true) + LimitString(Settings.Network.Hostname(), 30, true) + "\r\n";
             } else if (parameter[0].equalsIgnoreCase("scan")) {
-                result += "Network        | Scanning WiFi networks...\r\n";
+                client->write("Network        | Scanning WiFi networks...\r\n");
 
-                int n = WiFi.scanNetworks();
+                if (devNetwork->ConnectionMode() == APMode::WifiClient) client->write("               | WARNING: Device is connected as WiFi client. Scan may disrupt connection or cause reboot\r\n");
 
-                if (n == 0) {
-                    result += "               | No networks found.\r\n";
+                WiFi.scanDelete();
+                delay(10);
+
+                int n = WiFi.scanNetworks(false, false);
+
+                if (n < 0) {
+                    client->write("Network        | Error scanning WiFi networks.\r\n");
+                } else if (n == 0) {
+                    client->write("Network        | No networks found.\r\n");
                 } else {
                     for (int i = 0; i < n; ++i) {
                         String ssid = WiFi.SSID(i);
@@ -164,14 +171,22 @@ void Telnet::registerCommand_network(bool admincmd) {
                             default: enc_str = "?"; break;
                         }
 
-                        result += "               | [" + String(i + 1) + "] ";
-                        result += LimitString(ssid, 20, true);
-                        result += " RSSI: " + String(rssi);
-                        result += " Ch: " + String(ch);
-                        result += " " + enc_str + "\r\n";
+                        String line;
+                        line.reserve(128);
+                        line += "               | ";
+                        line += LimitString("[" + String(i + 1) + "] " + ssid, 30, true);
+                        line += " RSSI: " + String(rssi);
+                        line += " Ch: " + String(ch);
+                        line += " " + enc_str;
+                        line += "\r\n";
+
+                        client->write(line.c_str());
+                        delay(0);
                     }
 
-                    result += "               | Count: " + String(n) + "\r\n";
+                    String line;
+                    line = "               | Count: " + String(n) + "\r\n";
+                    client->write(line.c_str());
                 }
 
                 WiFi.scanDelete();
