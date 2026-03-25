@@ -24,4 +24,5 @@ class Telnet {
         static void registerCommand_mqtt(bool admincmd = true);
         static void registerCommand_user(bool admincmd = true);
         static void registerCommand_comp(bool admincmd = true);
+        static void registerCommand_log(bool admincmd = true);
 };

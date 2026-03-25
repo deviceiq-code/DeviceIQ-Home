@@ -20,6 +20,8 @@ using namespace DeviceIQ_Network;
 #define CHECK_BIT(var, pos) ((var) & (1 << (pos - 1)))
 
 inline bool IsEmpty(const char* s) { return (!s || *s == '\0'); }
+inline bool IsNumber(const String& s) { if (s.isEmpty()) return false; for (size_t i = 0; i < s.length(); ++i) if (!isDigit(s[i])) return false; return true; }
+
 inline void BuildDefaultHostname(char* out, size_t outSize) { if (!out || outSize == 0) return; uint8_t mac[6]; esp_read_mac(mac, ESP_MAC_WIFI_STA); snprintf(out, outSize, "DEV-%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]); }
 
 class SString : public String {

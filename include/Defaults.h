@@ -25,6 +25,7 @@ struct defaults_t {
         const uint8_t Level = 0b11111111; // All
         const char* SyslogServer = "syslog.svr";
         const uint16_t SyslogPort = 514;
+        const uint16_t ShowMaxLines = 20;
     } Log;
     struct network_t {
         const bool DHCPClient = true;

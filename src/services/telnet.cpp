@@ -28,6 +28,7 @@ void Telnet::Begin() {
         registerCommand_mqtt();
         registerCommand_user();
         registerCommand_comp();
+        registerCommand_log();
         
         devTelnetServer->begin();
         devLog->Write("Telnet Server: Enabled on port " + String(Settings.TelnetServer.Port()), LOGLEVEL_INFO);
@@ -1154,5 +1155,179 @@ void Telnet::registerCommand_comp(bool admincmd) {
             Settings.Save();
         }
         client->write(result.c_str());
+    }, admincmd);
+}
+void Telnet::registerCommand_log(bool admincmd) {
+    devTelnetServer->onCommand("log", "Show/clear log file\r\n\r\nlog [nlines][level|clear]", [&](AsyncClient* client, String* parameter) {
+
+        auto writeSafe = [&](const String& s) {
+            if (client == nullptr) return;
+            client->write(s.c_str());
+            yield();
+        };
+
+        auto isValidLevel = [&](const String& s) -> bool {
+            if (s.length() != 1) return false;
+            char c = toupper(s[0]);
+            return (c == 'E' || c == 'W' || c == 'I' || c == 'D');
+        };
+
+        size_t nlines = Defaults.Log.ShowMaxLines;
+        char levelFilter = '\0';
+
+        if (!parameter[0].isEmpty()) {
+            if (parameter[0].equalsIgnoreCase("clear")) {
+                devLog->Clear();
+                writeSafe("Log            | All log entries were cleared: " + String(Defaults.LogFileName) + "\r\n\r\n");
+                return;
+            }
+
+            if (IsNumber(parameter[0])) {
+                nlines = (size_t)parameter[0].toInt();
+
+                if (nlines == 0) {
+                    writeSafe("Log            | Invalid number of lines.\r\n");
+                    return;
+                }
+
+                if (nlines > 100) {
+                    nlines = 100;
+                }
+
+                if (!parameter[1].isEmpty()) {
+                    if (!isValidLevel(parameter[1])) {
+                        writeSafe("Log            | Invalid level filter.\r\n");
+                        writeSafe("               | Valid filters: E, W, I, D\r\n");
+                        writeSafe("               | Usage: log [nlines] [level|clear]\r\n");
+                        return;
+                    }
+
+                    levelFilter = toupper(parameter[1][0]);
+                }
+            } else if (isValidLevel(parameter[0])) {
+                levelFilter = toupper(parameter[0][0]);
+
+                if (!parameter[1].isEmpty()) {
+                    if (IsNumber(parameter[1])) {
+                        nlines = (size_t)parameter[1].toInt();
+
+                        if (nlines == 0) {
+                            writeSafe("Log            | Invalid number of lines.\r\n");
+                            return;
+                        }
+
+                        if (nlines > 100) {
+                            nlines = 100;
+                        }
+                    } else {
+                        writeSafe("Log            | Invalid parameter.\r\n");
+                        writeSafe("               | Usage: log [nlines] [level|clear]\r\n");
+                        return;
+                    }
+                }
+            } else {
+                writeSafe("Log            | Invalid parameter.\r\n");
+                writeSafe("               | Usage: log [nlines] [level|clear]\r\n");
+                writeSafe("               | Levels: E, W, I, D\r\n");
+                return;
+            }
+        }
+
+        File f = devFileSystem->OpenFile(Defaults.LogFileName, "r");
+        if (!f) {
+            writeSafe("Log            | Error opening log file '" + String(Defaults.LogFileName) + "'.\r\n");
+            return;
+        }
+
+        const size_t fileSize = f.size();
+        if (fileSize == 0) {
+            f.close();
+            writeSafe("Log            | Log file is empty: " + String(Defaults.LogFileName) + "\r\n");
+            return;
+        }
+
+        String* lines = new String[nlines];
+        if (lines == nullptr) {
+            f.close();
+            writeSafe("Log            | Not enough memory.\r\n");
+            return;
+        }
+
+        size_t count = 0;
+        String current;
+        current.reserve(256);
+
+        int32_t pos = (int32_t)fileSize - 1;
+
+        auto matchesLevel = [&](const String& line) -> bool {
+            if (levelFilter == '\0') return true;
+            return (line.length() > 1 && toupper(line[1]) == levelFilter);
+        };
+
+        while (pos >= 0 && count < nlines) {
+            f.seek(pos, SeekSet);
+            int c = f.read();
+
+            if (c < 0) break;
+
+            if (c == '\n') {
+                if (!current.isEmpty()) {
+                    String ready;
+                    ready.reserve(current.length());
+
+                    for (int i = (int)current.length() - 1; i >= 0; --i) {
+                        ready += current[i];
+                    }
+
+                    ready.trim();
+
+                    if (matchesLevel(ready)) {
+                        lines[count++] = ready;
+                    }
+
+                    current.clear();
+                }
+            } else if (c != '\r') {
+                current += (char)c;
+            }
+
+            pos--;
+
+            if ((pos & 0x1FF) == 0) {
+                yield();
+            }
+        }
+
+        if (!current.isEmpty() && count < nlines) {
+            String ready;
+            ready.reserve(current.length());
+
+            for (int i = (int)current.length() - 1; i >= 0; --i) {
+                ready += current[i];
+            }
+
+            ready.trim();
+
+            if (matchesLevel(ready)) {
+                lines[count++] = ready;
+            }
+        }
+
+        f.close();
+
+        String header = "Log            | Showing last " + String(count) + " log entr" + String(count == 1 ? "y" : "ies");
+        if (levelFilter != '\0') {
+            header += " [" + String(levelFilter) + "]";
+        }
+        header += ": " + String(Defaults.LogFileName) + "\r\n\r\n";
+
+        writeSafe(header);
+
+        for (int i = (int)count - 1; i >= 0; --i) {
+            writeSafe(lines[i] + "\r\n");
+        }
+
+        delete[] lines;
+
     }, admincmd);
 }
