@@ -756,7 +756,56 @@ void Telnet::registerCommand_comp(bool admincmd) {
         String result;
         bool changed = false;
 
-        if (parameter[0].equalsIgnoreCase("list")) {
+        if (parameter[0].equalsIgnoreCase("set")) {
+            if (!parameter[1].isEmpty()) {
+                Generic* target = Settings.Components[parameter[1]];
+
+                if (target == nullptr) {
+                    result += "Components     | Error finding component '" + parameter[1] + "'.\r\n";
+                } else {
+                    if (!parameter[2].isEmpty()) {
+                        switch (target->Class()) {
+                            case Classes::CLASS_RELAY : {
+                                String param = parameter[2];
+
+                                int sep = param.indexOf('=');
+                                if (sep <= 0 || sep >= param.length() - 1) {
+                                    result += "Components     | Invalid format. Use State=On|Off\r\n";
+                                    break;
+                                }
+
+                                String key = param.substring(0, sep);
+                                String value = param.substring(sep + 1);
+
+                                key.trim();
+                                value.trim();
+
+                                if (key.equalsIgnoreCase("State")) {
+                                    if (value.equalsIgnoreCase("On") || value.equalsIgnoreCase("True") || value.equalsIgnoreCase("Yes") || value.equalsIgnoreCase("1")) {
+                                        target->as<Relay>()->State(true);
+                                    } else if (value.equalsIgnoreCase("Off") || value.equalsIgnoreCase("False") || value.equalsIgnoreCase("No") || value.equalsIgnoreCase("0")) {
+                                        target->as<Relay>()->State(false);
+                                    } else if (value.equalsIgnoreCase("~") || value.equalsIgnoreCase("Invert")) {
+                                        target->as<Relay>()->Invert();
+                                    }
+                                    
+                                    result += "Components     | " + parameter[1] + " set to " + String(target->as<Relay>()->State() ? "ON" : "OFF") + "\r\n";
+                                } else {
+                                    result += "Components     | Unknown property '" + key + "'\r\n";
+                                }
+                            } break;
+                            
+                            default:
+                                break;
+                        }
+                    } else {
+                        result += "Components     | Missing component value\r\n               | set [componentname] [value]\r\n";
+                    }
+                }
+            } else {
+                result += "Components     | Invalid set parameter\r\n               | set [componentname] [value]\r\n";
+            }
+        } else if (parameter[0].equalsIgnoreCase("list")) {
             result += "Components     | Listing total of " + String(Settings.Components.Count()) + " component(s)\r\n";
 
             uint8_t mComponent_Count = 0;

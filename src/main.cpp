@@ -472,7 +472,7 @@ void loop() {
         // }
     }
 
-    // Settings.Components.Control();
+    Settings.Components.Control();
 
     // devSaveState->Control();
 }
