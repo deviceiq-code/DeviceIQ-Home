@@ -764,39 +764,55 @@ void Telnet::registerCommand_comp(bool admincmd) {
                     result += "Components     | Error finding component '" + parameter[1] + "'.\r\n";
                 } else {
                     if (!parameter[2].isEmpty()) {
-                        switch (target->Class()) {
-                            case Classes::CLASS_RELAY : {
-                                String param = parameter[2];
+                        String param = parameter[2];
 
-                                int sep = param.indexOf('=');
-                                if (sep <= 0 || sep >= param.length() - 1) {
-                                    result += "Components     | Invalid format. Use State=On|Off\r\n";
-                                    break;
-                                }
+                        int sep = param.indexOf('=');
+                        if (sep <= 0 || sep >= param.length() - 1) {
+                            result += "Components     | Invalid format. Use [key]=[value]\r\n";
+                        } else {
+                            String key = param.substring(0, sep);
+                            String value = param.substring(sep + 1);
 
-                                String key = param.substring(0, sep);
-                                String value = param.substring(sep + 1);
+                            key.trim();
+                            value.trim();
 
-                                key.trim();
-                                value.trim();
-
-                                if (key.equalsIgnoreCase("State")) {
-                                    if (value.equalsIgnoreCase("On") || value.equalsIgnoreCase("True") || value.equalsIgnoreCase("Yes") || value.equalsIgnoreCase("1")) {
-                                        target->as<Relay>()->State(true);
-                                    } else if (value.equalsIgnoreCase("Off") || value.equalsIgnoreCase("False") || value.equalsIgnoreCase("No") || value.equalsIgnoreCase("0")) {
-                                        target->as<Relay>()->State(false);
-                                    } else if (value.equalsIgnoreCase("~") || value.equalsIgnoreCase("Invert")) {
-                                        target->as<Relay>()->Invert();
+                            switch (target->Class()) {
+                                case Classes::CLASS_RELAY : {
+                                    if (key.equalsIgnoreCase("State")) {
+                                        if (value.equalsIgnoreCase("On") || value.equalsIgnoreCase("True") || value.equalsIgnoreCase("Yes") || value.equalsIgnoreCase("1")) {
+                                            target->as<Relay>()->State(true);
+                                        } else if (value.equalsIgnoreCase("Off") || value.equalsIgnoreCase("False") || value.equalsIgnoreCase("No") || value.equalsIgnoreCase("0")) {
+                                            target->as<Relay>()->State(false);
+                                        } else if (value.equalsIgnoreCase("~") || value.equalsIgnoreCase("Invert")) {
+                                            target->as<Relay>()->Invert();
+                                        }
+                                        
+                                        result += "Components     | " + parameter[1] + " set to " + String(target->as<Relay>()->State() ? "ON" : "OFF") + "\r\n";
+                                    } else {
+                                        result += "Components     | Unknown key '" + key + "'\r\n";
                                     }
-                                    
-                                    result += "Components     | " + parameter[1] + " set to " + String(target->as<Relay>()->State() ? "ON" : "OFF") + "\r\n";
-                                } else {
-                                    result += "Components     | Unknown property '" + key + "'\r\n";
-                                }
-                            } break;
-                            
-                            default:
-                                break;
+                                } break;
+                                case Classes::CLASS_BUTTON : {
+                                    if (key.equalsIgnoreCase("Do")) {
+                                        if (value.equalsIgnoreCase("ClickSingle")) {
+                                            target->as<Button>()->Do(ClickTypes::CLICKTYPE_SINGLE);
+                                        } else if (value.equalsIgnoreCase("ClickDouble")) {
+                                            target->as<Button>()->Do(ClickTypes::CLICKTYPE_DOUBLE);
+                                        } else if (value.equalsIgnoreCase("ClickTriple")) {
+                                            target->as<Button>()->Do(ClickTypes::CLICKTYPE_TRIPLE);
+                                        } else if (value.equalsIgnoreCase("ClickLong")) {
+                                            target->as<Button>()->Do(ClickTypes::CLICKTYPE_LONG);
+                                        }
+
+                                        result += "Components     | Sent " + value + " to " + parameter[1] +  + "\r\n";
+                                    } else {
+                                        result += "Components     | Unknown key '" + key + "'\r\n";
+                                    }
+                                } break;
+                                
+                                default:
+                                    break;
+                            }
                         }
                     } else {
                         result += "Components     | Missing component value\r\n               | set [componentname] [value]\r\n";
