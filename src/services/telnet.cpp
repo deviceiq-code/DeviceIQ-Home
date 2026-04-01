@@ -794,17 +794,27 @@ void Telnet::registerCommand_comp(bool admincmd) {
                                 } break;
                                 case Classes::CLASS_BUTTON : {
                                     if (key.equalsIgnoreCase("Do")) {
+                                        bool valid = false;
+
                                         if (value.equalsIgnoreCase("ClickSingle")) {
                                             target->as<Button>()->Do(ClickTypes::CLICKTYPE_SINGLE);
+                                            valid = true;
                                         } else if (value.equalsIgnoreCase("ClickDouble")) {
                                             target->as<Button>()->Do(ClickTypes::CLICKTYPE_DOUBLE);
+                                            valid = true;
                                         } else if (value.equalsIgnoreCase("ClickTriple")) {
                                             target->as<Button>()->Do(ClickTypes::CLICKTYPE_TRIPLE);
+                                            valid = true;
                                         } else if (value.equalsIgnoreCase("ClickLong")) {
                                             target->as<Button>()->Do(ClickTypes::CLICKTYPE_LONG);
+                                            valid = true;
                                         }
 
-                                        result += "Components     | Sent " + value + " to " + parameter[1] +  + "\r\n";
+                                        if (valid) {
+                                            result += "Components     | Sent " + value + " to " + parameter[1] +  + "\r\n";
+                                        } else {
+                                            result += "Components     | Invalid set '" + value + "' to " + parameter[1] +  + "\r\n";
+                                        }
                                     } else {
                                         result += "Components     | Unknown key '" + key + "'\r\n";
                                     }
@@ -821,6 +831,8 @@ void Telnet::registerCommand_comp(bool admincmd) {
             } else {
                 result += "Components     | Invalid set parameter\r\n               | set [componentname] [value]\r\n";
             }
+        } else if (parameter[0].equalsIgnoreCase("event")) {
+            result += "Components     | Events\r\n";
         } else if (parameter[0].equalsIgnoreCase("list")) {
             result += "Components     | Listing total of " + String(Settings.Components.Count()) + " component(s)\r\n";
 
