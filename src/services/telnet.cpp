@@ -832,7 +832,184 @@ void Telnet::registerCommand_comp(bool admincmd) {
                 result += "Components     | Invalid set parameter\r\n               | set [componentname] [value]\r\n";
             }
         } else if (parameter[0].equalsIgnoreCase("event")) {
-            result += "Components     | Events\r\n";
+            if (parameter[1].isEmpty()) {
+                result += "Components     | Missing component name\r\n";
+                result += "               | event [componentname]\r\n";
+                result += "               | event [componentname] [eventname] '[script]'\r\n";
+            } else {
+                Generic* target = Settings.Components[parameter[1]];
+
+                if (target == nullptr) {
+                    result += "Components     | Error finding component '" + parameter[1] + "'.\r\n";
+                } else {
+                    // =========================
+                    // LISTAR EVENTOS
+                    // =========================
+                    if (parameter[2].isEmpty()) {
+                        File f = devFileSystem->OpenFile(Defaults.ConfigFileName, "r");
+                        if (!f || !f.available()) {
+                            if (f) f.close();
+                            result += "Components     | Error opening configuration file.\r\n";
+                        } else {
+                            JsonDocument doc;
+                            DeserializationError err = deserializeJson(doc, f);
+                            f.close();
+
+                            if (err) {
+                                result += "Components     | Error parsing configuration file.\r\n";
+                            } else {
+                                JsonArray components = doc["Components"].as<JsonArray>();
+                                if (components.isNull()) {
+                                    result += "Components     | No components found in configuration.\r\n";
+                                } else {
+                                    bool found = false;
+
+                                    for (JsonObject comp : components) {
+                                        String compName = String(comp["Name"] | "");
+                                        if (!compName.equalsIgnoreCase(parameter[1])) continue;
+
+                                        found = true;
+                                        result += "Components     | Events for '" + compName + "'\r\n\r\n";
+
+                                        JsonObject events = comp["Events"].as<JsonObject>();
+                                        if (events.isNull() || events.size() == 0) {
+                                            result += "               | No events assigned.\r\n";
+                                        } else {
+                                            for (JsonPair kv : events) {
+                                                String eventName = String(kv.key().c_str());
+                                                String eventValue;
+
+                                                if (kv.value().is<const char*>()) {
+                                                    eventValue = String(kv.value().as<const char*>());
+                                                } else {
+                                                    serializeJson(kv.value(), eventValue);
+                                                }
+
+                                                result += "               | " + eventName + " = " + eventValue + "\r\n";
+                                            }
+                                        }
+
+                                        break;
+                                    }
+
+                                    if (!found) {
+                                        result += "Components     | Component '" + parameter[1] + "' was instantiated but not found in config.\r\n";
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // =========================
+                    // SETAR / LIMPAR EVENTO
+                    // =========================
+                    else {
+                        const String eventName = parameter[2];
+
+                        auto itEvent = target->Event.find(eventName);
+                        if (itEvent == target->Event.end()) {
+                            result += "Components     | Event '" + eventName + "' is not valid for component '" + parameter[1] + "'.\r\n";
+
+                            if (!target->Event.empty()) {
+                                result += "               | Valid events: ";
+                                bool first = true;
+                                for (const auto& ev : target->Event) {
+                                    if (!first) result += ", ";
+                                    result += ev.first;
+                                    first = false;
+                                }
+                                result += "\r\n";
+                            } else {
+                                result += "               | This component does not expose configurable events.\r\n";
+                            }
+                        } else {
+                            File f = devFileSystem->OpenFile(Defaults.ConfigFileName, "r");
+                            if (!f || !f.available()) {
+                                if (f) f.close();
+                                result += "Components     | Error opening configuration file.\r\n";
+                            } else {
+                                JsonDocument doc;
+                                DeserializationError err = deserializeJson(doc, f);
+                                f.close();
+
+                                if (err) {
+                                    result += "Components     | Error parsing configuration file.\r\n";
+                                } else {
+                                    JsonArray components = doc["Components"].as<JsonArray>();
+                                    if (components.isNull()) {
+                                        result += "Components     | No components found in configuration.\r\n";
+                                    } else {
+                                        bool found = false;
+
+                                        for (JsonObject comp : components) {
+                                            String compName = String(comp["Name"] | "");
+                                            if (!compName.equalsIgnoreCase(parameter[1])) continue;
+
+                                            found = true;
+
+                                            JsonObject events = comp["Events"].as<JsonObject>();
+                                            if (events.isNull()) {
+                                                events = comp.createNestedObject("Events");
+                                            }
+
+                                            // =========================
+                                            // RECONSTRUIR SCRIPT
+                                            // =========================
+                                            String script;
+                                            for (int i = 3; !parameter[i].isEmpty(); ++i) {
+                                                if (!script.isEmpty()) script += " ";
+                                                script += parameter[i];
+                                            }
+
+                                            script.trim();
+
+                                            // remove aspas externas
+                                            if (script.length() >= 2 && script.startsWith("'") && script.endsWith("'")) {
+                                                script = script.substring(1, script.length() - 1);
+                                            } else if (script.length() >= 2 && script.startsWith("\"") && script.endsWith("\"")) {
+                                                script = script.substring(1, script.length() - 1);
+                                            }
+
+                                            // =========================
+                                            // SET / CLEAR
+                                            // =========================
+                                            if (script.isEmpty()) {
+                                                events.remove(eventName);
+                                                result += "Components     | Event '" + eventName + "' cleared for component '" + compName + "'.\r\n";
+                                            } else {
+                                                events[eventName] = script;
+                                                result += "Components     | Event '" + eventName + "' set for component '" + compName + "'.\r\n";
+                                            }
+
+                                            // =========================
+                                            // SALVAR JSON
+                                            // =========================
+                                            File wf = devFileSystem->OpenFile(Defaults.ConfigFileName, "w");
+                                            if (!wf) {
+                                                result += "               | Error saving configuration.\r\n";
+                                            } else {
+                                                size_t written = serializeJsonPretty(doc, wf);
+                                                wf.close();
+
+                                                if (written == 0) {
+                                                    result += "               | Error saving configuration.\r\n";
+                                                } else {
+                                                    result += "               | Configuration saved.\r\n";
+                                                }
+                                            }
+
+                                            break;
+                                        }
+
+                                        if (!found) {
+                                            result += "Components     | Component '" + parameter[1] + "' was instantiated but not found in config.\r\n";
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         } else if (parameter[0].equalsIgnoreCase("list")) {
             result += "Components     | Listing total of " + String(Settings.Components.Count()) + " component(s)\r\n";
 
