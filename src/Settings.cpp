@@ -827,10 +827,10 @@ bool settings_t::InstallComponents(const String& configfilename) noexcept {
         if (!NewComponent) return;
 
         JsonObjectConst EventsInConfig = comp["Events"];
+        if (EventsInConfig.isNull()) return;
 
         for (auto& ComponentEvent : NewComponent->Event) {
             const String& eventName = ComponentEvent.first;
-            auto& setHandler = ComponentEvent.second;
 
             JsonVariantConst v = EventsInConfig[eventName.c_str()];
             if (v.isNull() || !v.is<const char*>()) continue;
@@ -848,63 +848,79 @@ bool settings_t::InstallComponents(const String& configfilename) noexcept {
 
             param.replace("%NAME%", NewComponent->Name());
 
+            callback_t previous = NewComponent->GetEventCallback(eventName);
+            callback_t appended = nullptr;
+
             if (cmd.equalsIgnoreCase("log")) {
                 String msg = param;
                 auto logPtr = devLog;
-                setHandler([msg, logPtr] {
+
+                appended = [msg, logPtr] {
                     if (logPtr) logPtr->Write(msg, LOGLEVEL_INFO);
-                });
-            } else if (cmd.equalsIgnoreCase("enable")) {
+                };
+            }
+            else if (cmd.equalsIgnoreCase("enable")) {
                 String targetName = param;
                 auto* target = Components[targetName];
 
                 if (target) {
                     auto* generic = target->as<Generic>();
-                    setHandler([generic] {
+                    appended = [generic] {
                         generic->Enabled(true);
-                    });
-                }
-            } else if (cmd.equalsIgnoreCase("disable")) {
-                String targetName = param;
-                auto* target = Components[targetName];
-
-                if (target) {
-                    auto* generic = target->as<Generic>();
-                    setHandler([generic] {
-                        generic->Enabled(false);
-                    });
-                }
-            } else if (cmd.equalsIgnoreCase("invert")) {
-                String targetName = param;
-                auto* target = Components[targetName];
-
-                if (target && target->Class() == CLASS_RELAY) {
-                    auto* relay = target->as<Relay>();
-                    setHandler([relay] {
-                        relay->Invert();
-                    });
-                }
-            } else if (cmd.equalsIgnoreCase("seton")) {
-                String targetName = param;
-                auto* target = Components[targetName];
-
-                if (target && target->Class() == CLASS_RELAY) {
-                    auto* relay = target->as<Relay>();
-                    setHandler([relay] {
-                        relay->State(true);
-                    });
-                }
-            } else if (cmd.equalsIgnoreCase("setoff")) {
-                String targetName = param;
-                auto* target = Components[targetName];
-
-                if (target && target->Class() == CLASS_RELAY) {
-                    auto* relay = target->as<Relay>();
-                    setHandler([relay] {
-                        relay->State(false);
-                    });
+                    };
                 }
             }
+            else if (cmd.equalsIgnoreCase("disable")) {
+                String targetName = param;
+                auto* target = Components[targetName];
+
+                if (target) {
+                    auto* generic = target->as<Generic>();
+                    appended = [generic] {
+                        generic->Enabled(false);
+                    };
+                }
+            }
+            else if (cmd.equalsIgnoreCase("invert")) {
+                String targetName = param;
+                auto* target = Components[targetName];
+
+                if (target && target->Class() == CLASS_RELAY) {
+                    auto* relay = target->as<Relay>();
+                    appended = [relay] {
+                        relay->Invert();
+                    };
+                }
+            }
+            else if (cmd.equalsIgnoreCase("seton")) {
+                String targetName = param;
+                auto* target = Components[targetName];
+
+                if (target && target->Class() == CLASS_RELAY) {
+                    auto* relay = target->as<Relay>();
+                    appended = [relay] {
+                        relay->State(true);
+                    };
+                }
+            }
+            else if (cmd.equalsIgnoreCase("setoff")) {
+                String targetName = param;
+                auto* target = Components[targetName];
+
+                if (target && target->Class() == CLASS_RELAY) {
+                    auto* relay = target->as<Relay>();
+                    appended = [relay] {
+                        relay->State(false);
+                    };
+                }
+            }
+
+            if (!appended) continue;
+
+            NewComponent->SetEventCallback(eventName, [previous, appended] {
+                if (previous) previous();
+                appended();
+            });
         }
     };
 
