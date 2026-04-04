@@ -819,6 +819,20 @@ void Telnet::registerCommand_comp(bool admincmd) {
                                         result += "Components     | Unknown key '" + key + "'\r\n";
                                     }
                                 } break;
+
+                                case Classes::CLASS_BLINDS : {
+                                    if (key.equalsIgnoreCase("State")) {
+                                        if (value.equalsIgnoreCase("Open")) {
+                                            target->as<Blinds>()->Open();
+                                        } else if (value.equalsIgnoreCase("Close")) {
+                                            target->as<Blinds>()->Close();
+                                        }
+                                        
+                                        result += "Components     | " + parameter[1] + " set to " + value + "\r\n";
+                                    } else {
+                                        result += "Components     | Unknown key '" + key + "'\r\n";
+                                    }
+                                } break;
                                 
                                 default:
                                     break;
