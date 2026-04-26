@@ -997,13 +997,14 @@ bool settings_t::InstallComponents(const String& configfilename) noexcept {
 
                             auto* n = NewComponent->as<Blinds>();
                             n->Event["Changed"]([this, n] {
-                                if (devMQTT) {
-                                    devMQTT->Publish(Network.Hostname() + "/Get/Blinds:" + n->Name() + ":Position", String(n->Position()));
-                                    devMQTT->Publish(Network.Hostname() + "/Get/Blinds:" + n->Name() + ":State", String(n->State()));
-                                }
+                            if (devMQTT) {
+                                devMQTT->Publish(Network.Hostname() + "/Get/Blinds:" + n->Name() + ":CurrentPosition", String(n->CurrentPosition()));
+                                devMQTT->Publish(Network.Hostname() + "/Get/Blinds:" + n->Name() + ":TargetPosition", String(n->TargetPosition()));
+                                devMQTT->Publish(Network.Hostname() + "/Get/Blinds:" + n->Name() + ":PositionState", String(n->PositionState()));
+                            }
 
-                                pSaveComponentsStateFlag = true;
-                            });
+                            pSaveComponentsStateFlag = true;
+                        });
                         }
                     } else {
                         if (devLog) devLog->Write("Component: Blinds '" + comp_name + "' not created: relay up/down are invalid", LOGLEVEL_WARNING);

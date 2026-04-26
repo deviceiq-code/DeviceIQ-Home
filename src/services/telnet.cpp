@@ -829,7 +829,7 @@ void Telnet::registerCommand_comp(bool admincmd) {
                                         }
                                         
                                         result += "Components     | " + parameter[1] + " set to " + value + "\r\n";
-                                    } else if (key.equalsIgnoreCase("Position")) {
+                                    } else if (key.equalsIgnoreCase("TargetPosition")) {
                                         target->as<Blinds>()->Position(value.toInt());
                                         result += "Components     | " + parameter[1] + " set to " + String(constrain(value.toInt(), 0 ,100)) + "\r\n";
                                     } else {

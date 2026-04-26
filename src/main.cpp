@@ -363,20 +363,43 @@ void setup() {
                                             if (!tmpClass.equalsIgnoreCase("blinds")) {
                                                 devLog->Write("MQTT: Class mismatch - topic says [" + tmpClass + "], actual is Blinds:" + tmpName, LOGLEVEL_WARNING);
                                             } else {
-                                                if (tmpProperty == "position") {
+                                                auto blinds = comp->as<Blinds>();
+
+                                                if (tmpProperty == "targetposition" || tmpProperty == "position") {
                                                     int position = tmpPayload.toInt();
 
                                                     if (position < 0 || position > 100) {
                                                         devLog->Write("MQTT: Invalid Blinds position [" + tmpPayload + "]", LOGLEVEL_WARNING);
                                                     } else {
-                                                        comp->as<Blinds>()->Position(position);
+                                                        blinds->Position(position);
+                                                    }
+                                                }
+                                                else if (tmpProperty == "currentposition") {
+                                                    int position = tmpPayload.toInt();
+
+                                                    if (position < 0 || position > 100) {
+                                                        devLog->Write("MQTT: Invalid Blinds current position [" + tmpPayload + "]", LOGLEVEL_WARNING);
+                                                    } else {
+                                                        blinds->Position(position, true); // sync sem movimento
+                                                    }
+                                                }
+                                                else if (tmpProperty == "state" || tmpProperty == "positionstate") {
+                                                    int state = tmpPayload.toInt();
+
+                                                    if (state == 2) {
+                                                        blinds->Stop();
+                                                    } else {
+                                                        devLog->Write("MQTT: Ignoring Blinds state [" + tmpPayload + "]", LOGLEVEL_WARNING);
                                                     }
                                                 }
                                                 else if (tmpProperty == "open") {
-                                                    comp->as<Blinds>()->Open();
+                                                    blinds->Open();
                                                 }
                                                 else if (tmpProperty == "close") {
-                                                    comp->as<Blinds>()->Close();
+                                                    blinds->Close();
+                                                }
+                                                else if (tmpProperty == "stop") {
+                                                    blinds->Stop();
                                                 }
                                                 else {
                                                     devLog->Write("MQTT: Unsupported Blinds property [" + tmpProperty + "]", LOGLEVEL_WARNING);
