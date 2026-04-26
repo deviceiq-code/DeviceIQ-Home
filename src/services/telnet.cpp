@@ -848,6 +848,28 @@ void Telnet::registerCommand_comp(bool admincmd) {
             } else {
                 result += "Components     | Invalid set parameter\r\n               | set [componentname] [value]\r\n";
             }
+        } else if (parameter[0].equalsIgnoreCase("get")) {
+            if (!parameter[1].isEmpty()) {
+                Generic* target = Settings.Components[parameter[1]];
+
+                if (target == nullptr) {
+                    result += "Components     | Error finding component '" + parameter[1] + "'.\r\n";
+                } else {
+                    result += "Components     | " + parameter[1] + "\r\n";
+                    switch (target->Class()) {
+                        case Classes::CLASS_RELAY : {
+                            result += "               | State: " + String(target->as<Relay>()->State() ? "On" : "Off") + "\r\n";
+                        } break;
+                        case Classes::CLASS_BLINDS : {
+                            result += "               | Target Positon: " + String(target->as<Blinds>()->TargetPosition()) + "\r\n";
+                            result += "               | Current Positon: " + String(target->as<Blinds>()->CurrentPosition()) + "\r\n";
+                            result += "               | State: " + String(target->as<Blinds>()->State() == BLINDSSTATE_DECREASING ? "Closing" : (target->as<Blinds>()->State() == BLINDSSTATE_INCREASING ? "Opening" : "Stopped")) + "\r\n";
+                        } break;
+                    }                    
+                }
+            } else {
+                result += "Components     | Invalid set parameter\r\n               | get [componentname]\r\n";
+            }
         } else if (parameter[0].equalsIgnoreCase("event")) {
             if (parameter[1].isEmpty()) {
                 result += "Components     | Missing component name\r\n";
