@@ -1073,7 +1073,7 @@ bool settings_t::InstallComponents(const String& configfilename) noexcept {
                     n->State((bool)(comp["State"] | false));
 
                     n->Event["Changed"]([this, n] {
-                        if (devMQTT) devMQTT->Publish(Network.Hostname() + "/Get/Relay:" + n->Name(), n->State() ? "on" : "off");
+                        if (devMQTT) devMQTT->Publish(Network.Hostname() + "/Get/Relay:" + n->Name() + ":State", n->State() ? "on" : "off");
                         pSaveComponentsStateFlag = true;
                     });
                 }

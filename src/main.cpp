@@ -303,32 +303,38 @@ void setup() {
                             const String prefixSet = devNetwork->Hostname() + "/Set/";
 
                             if (topic.startsWith(prefixSet) == true) {
-                                String tmpClass, tmpName, tmpPayload;
+                                String tmpClass, tmpName, tmpProperty, tmpPayload;
 
                                 String rest = topic.substring(prefixSet.length());
+
                                 int slash = rest.indexOf('/');
                                 if (slash >= 0) rest = rest.substring(0, slash);
 
-                                int colon = rest.indexOf(':');
-                                if (colon <= 0 || colon == rest.length()-1) { 
-                                    devLog->Write("MQTT: Data received does not have expected structure", LOGLEVEL_WARNING);
+                                int colon1 = rest.indexOf(':');
+                                int colon2 = rest.indexOf(':', colon1 + 1);
+
+                                if (colon1 <= 0 || colon2 <= colon1 + 1 || colon2 >= rest.length() - 1) {
+                                    devLog->Write("MQTT: Invalid topic format. Expected Class:Name:Property", LOGLEVEL_WARNING);
                                     return;
                                 }
 
-                                tmpClass = rest.substring(0, colon);
-                                tmpName  = rest.substring(colon + 1);
-                                tmpPayload = payload;
-                                
+                                tmpClass    = rest.substring(0, colon1);
+                                tmpName     = rest.substring(colon1 + 1, colon2);
+                                tmpProperty = rest.substring(colon2 + 1);
+                                tmpPayload  = payload;
+
                                 tmpClass.trim();
                                 tmpName.trim();
+                                tmpProperty.trim();
                                 tmpPayload.trim();
 
+                                tmpProperty.toLowerCase();
                                 tmpPayload.toLowerCase();
 
-                                auto comp =  Settings.Components[tmpName];
+                                auto comp = Settings.Components[tmpName];
 
                                 if (!comp) {
-                                    devLog->Write("MQTT: Target not found [" + tmpClass + ":" + tmpName + "]", LOGLEVEL_WARNING);
+                                    devLog->Write("MQTT: Target not found [" + tmpClass + ":" + tmpName + ":" + tmpProperty + "]", LOGLEVEL_WARNING);
                                 } else {
                                     switch (comp->Class()) {
 
@@ -336,44 +342,69 @@ void setup() {
                                             if (!tmpClass.equalsIgnoreCase("relay")) {
                                                 devLog->Write("MQTT: Class mismatch - topic says [" + tmpClass + "], actual is Relay:" + tmpName, LOGLEVEL_WARNING);
                                             } else {
-                                                if (tmpPayload == "on" || tmpPayload == "true" || tmpPayload == "1")
-                                                    comp->as<Relay>()->State(true);
-                                                else if (tmpPayload == "off" || tmpPayload == "false" || tmpPayload == "0")
-                                                    comp->as<Relay>()->State(false);
-                                                else if (tmpPayload == "toggle" || tmpPayload == "invert" || tmpPayload == "~")
+                                                if (tmpProperty == "state") {
+                                                    if (tmpPayload == "on" || tmpPayload == "true" || tmpPayload == "1")
+                                                        comp->as<Relay>()->State(true);
+                                                    else if (tmpPayload == "off" || tmpPayload == "false" || tmpPayload == "0")
+                                                        comp->as<Relay>()->State(false);
+                                                    else
+                                                        devLog->Write("MQTT: Invalid Relay state payload [" + tmpPayload + "]", LOGLEVEL_WARNING);
+                                                }
+                                                else if (tmpProperty == "toggle" || tmpProperty == "invert") {
                                                     comp->as<Relay>()->Invert();
+                                                }
+                                                else {
+                                                    devLog->Write("MQTT: Unsupported Relay property [" + tmpProperty + "]", LOGLEVEL_WARNING);
+                                                }
                                             }
                                         } break;
 
                                         case CLASS_BLINDS: {
                                             if (!tmpClass.equalsIgnoreCase("blinds")) {
                                                 devLog->Write("MQTT: Class mismatch - topic says [" + tmpClass + "], actual is Blinds:" + tmpName, LOGLEVEL_WARNING);
-                                            } else { 
-                                                // handleBlinds(comp, data);
+                                            } else {
+                                                if (tmpProperty == "position") {
+                                                    int position = tmpPayload.toInt();
+
+                                                    if (position < 0 || position > 100) {
+                                                        devLog->Write("MQTT: Invalid Blinds position [" + tmpPayload + "]", LOGLEVEL_WARNING);
+                                                    } else {
+                                                        comp->as<Blinds>()->Position(position);
+                                                    }
+                                                }
+                                                else if (tmpProperty == "open") {
+                                                    comp->as<Blinds>()->Open();
+                                                }
+                                                else if (tmpProperty == "close") {
+                                                    comp->as<Blinds>()->Close();
+                                                }
+                                                else {
+                                                    devLog->Write("MQTT: Unsupported Blinds property [" + tmpProperty + "]", LOGLEVEL_WARNING);
+                                                }
                                             }
                                         } break;
 
                                         case CLASS_BUTTON: {
                                             if (!tmpClass.equalsIgnoreCase("button")) {
                                                 devLog->Write("MQTT: Class mismatch - topic says [" + tmpClass + "], actual is Button:" + tmpName, LOGLEVEL_WARNING);
-                                            } else { 
-                                                // handleButton(comp, data);
+                                            } else {
+                                                // handleButton(comp, tmpProperty, tmpPayload);
                                             }
                                         } break;
 
                                         case CLASS_THERMOMETER: {
                                             if (!tmpClass.equalsIgnoreCase("thermometer")) {
                                                 devLog->Write("MQTT: Class mismatch - topic says [" + tmpClass + "], actual is Thermometer:" + tmpName, LOGLEVEL_WARNING);
-                                            } else { 
-                                                // handleThermometer(comp, data);
+                                            } else {
+                                                // handleThermometer(comp, tmpProperty, tmpPayload);
                                             }
                                         } break;
 
                                         case CLASS_CURRENTMETER: {
                                             if (!tmpClass.equalsIgnoreCase("currentmeter")) {
                                                 devLog->Write("MQTT: Class mismatch - topic says [" + tmpClass + "], actual is Currentmeter:" + tmpName, LOGLEVEL_WARNING);
-                                            } else { 
-                                                // handleCurrentmeter(comp, data);
+                                            } else {
+                                                // handleCurrentmeter(comp, tmpProperty, tmpPayload);
                                             }
                                         } break;
 
@@ -388,9 +419,9 @@ void setup() {
                         });
 
                         if (devMQTT->Connect()) {
-                            devLog->Write("MQTT: Connected on " + Settings.MQTT.User() + "@" + Settings.MQTT.Broker() + ":" +String(Settings.MQTT.Port()) , LOGLEVEL_INFO);
+                            devLog->Write("MQTT: Connected on " + Settings.MQTT.User() + "@" + Settings.MQTT.Broker() + ":" + String(Settings.MQTT.Port()), LOGLEVEL_INFO);
                         } else {
-                            devLog->Write("MQTT: Unable to connected to " + Settings.MQTT.User() + "@" + Settings.MQTT.Broker() + ":" +String(Settings.MQTT.Port()) , LOGLEVEL_ERROR);
+                            devLog->Write("MQTT: Unable to connected to " + Settings.MQTT.User() + "@" + Settings.MQTT.Broker() + ":" + String(Settings.MQTT.Port()), LOGLEVEL_ERROR);
                         }
                     } else {
                         devLog->Write("MQTT: Disabled", LOGLEVEL_INFO);
