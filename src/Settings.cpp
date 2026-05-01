@@ -992,15 +992,21 @@ bool settings_t::InstallComponents(const String& configfilename) noexcept {
 
                         NewComponent = new Blinds(comp_name, comp_id, relayUp, relayDn);
 
-                        if (NewComponent) {
-                            NewComponent->as<Blinds>()->Position((uint8_t)(comp["Position"] | 0), true);
+                        Blinds* tmp_blinds = NewComponent->as<Blinds>();
 
-                            auto* n = NewComponent->as<Blinds>();
-                            n->Event["Changed"]([this, n] {
+                        if (tmp_blinds) {
+                            tmp_blinds->StepMs(comp["Step Ms"] | Defaults.Components.Blinds.StepMs);
+                            tmp_blinds->OpenAccel(comp["Open Acceleration"] | Defaults.Components.Blinds.OpenAccel);
+                            tmp_blinds->CloseAccel(comp["Close Acceleration"] | Defaults.Components.Blinds.CloseAccel);
+                            tmp_blinds->CalibrationMultiplier(comp["Calibration Multiplier"].as<uint8_t>() | Defaults.Components.Blinds.CalibrationMultiplier);
+                            tmp_blinds->Position((comp["Position"].as<uint8_t>() | 0), true);
+
+                            tmp_blinds->Event["Changed"]([this, tmp_blinds] {
                             if (devMQTT) {
-                                devMQTT->Publish(Network.Hostname() + "/Get/Blinds:" + n->Name() + ":CurrentPosition", String(n->CurrentPosition()));
-                                devMQTT->Publish(Network.Hostname() + "/Get/Blinds:" + n->Name() + ":TargetPosition", String(n->TargetPosition()));
-                                devMQTT->Publish(Network.Hostname() + "/Get/Blinds:" + n->Name() + ":PositionState", String(n->PositionState()));
+                                devMQTT->Publish(Network.Hostname() + "/Get/Blinds:" + tmp_blinds->Name() + ":Name", tmp_blinds->Name());
+                                devMQTT->Publish(Network.Hostname() + "/Get/Blinds:" + tmp_blinds->Name() + ":CurrentPosition", String(tmp_blinds->CurrentPosition()));
+                                devMQTT->Publish(Network.Hostname() + "/Get/Blinds:" + tmp_blinds->Name() + ":TargetPosition", String(tmp_blinds->TargetPosition()));
+                                devMQTT->Publish(Network.Hostname() + "/Get/Blinds:" + tmp_blinds->Name() + ":PositionState", String(tmp_blinds->PositionState()));
                             }
 
                             pSaveComponentsStateFlag = true;
@@ -1354,6 +1360,10 @@ bool settings_t::Save(const String& configfilename) const noexcept {
                     item["Relay Up"] = (b->RelayUp() != nullptr) ? b->RelayUp()->Name() : "";
                     item["Relay Down"] = (b->RelayDown() != nullptr) ? b->RelayDown()->Name() : "";
                     item["Position"] = b->Position();
+                    item["Step Ms"] = b->StepMs();
+                    item["Open Acceleration"] = b->OpenAccel();
+                    item["Close Acceleration"] = b->CloseAccel();
+                    item["Calibration Multiplier"] = b->CalibrationMultiplier();
                 } break;
 
                 default: {

@@ -80,6 +80,12 @@ struct defaults_t {
     } MQTT;
     struct components_t {
         const bool Enabled = true;
+        struct blinds_t {
+            const uint16_t StepMs = 250;
+            const float OpenAccel = 0.0f;
+            const float CloseAccel = 0.0f;
+            const uint8_t CalibrationMultiplier = 3;
+        } Blinds;
     } Components;
     const char* ConfigFileName = "/config.json";
     const char* LogFileName = "/device.log";

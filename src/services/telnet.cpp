@@ -864,8 +864,13 @@ void Telnet::registerCommand_comp(bool admincmd) {
                             result += "               | Target Positon: " + String(target->as<Blinds>()->TargetPosition()) + "\r\n";
                             result += "               | Current Positon: " + String(target->as<Blinds>()->CurrentPosition()) + "\r\n";
                             result += "               | State: " + String(target->as<Blinds>()->State() == BLINDSSTATE_DECREASING ? "Closing" : (target->as<Blinds>()->State() == BLINDSSTATE_INCREASING ? "Opening" : "Stopped")) + "\r\n";
+                            result += "               | Step Ms: " + String(target->as<Blinds>()->StepMs()) + "\r\n";
+                            result += "               | Open Accelerator: " + String(target->as<Blinds>()->OpenAccel()) + "\r\n";
+                            result += "               | Close Accelerator: " + String(target->as<Blinds>()->CloseAccel()) + "\r\n";
+                            result += "               | Calibration Multiplier: " + String(target->as<Blinds>()->CalibrationMultiplier()) + "\r\n";
                         } break;
-                    }                    
+                    }
+                    result += "               | Enabled: " + String(target->Enabled() ? "Yes" : "No") + "\r\n";
                 }
             } else {
                 result += "Components     | Invalid set parameter\r\n               | get [componentname]\r\n";
@@ -1188,86 +1193,121 @@ void Telnet::registerCommand_comp(bool admincmd) {
                                 if (c == CLASS_BLINDS) {
                                     if (bus_type != BUS_GROUP) {
                                         result += "Components     | Class 'Blinds' only supports bus 'Group'.\r\n";
-                                        result += "               | Usage: comp add <name> Blinds@Group:<relay_up>,<relay_down> [enabled]\r\n";
+                                        result += "               | Usage: comp add <name> Blinds@Group:<relay_up>,<relay_down> <StepMs> [OpenAccel] [CloseAccel] [CalibrationMultiplier] [enabled]\r\n";
                                     } else {
-                                        bool comp_enabled = parameter[3].isEmpty() ? true : parameter[3].equalsIgnoreCase("true");
+                                        String step_ms_str = parameter[3];
 
-                                        int comma = comp_addr_str.indexOf(',');
-                                        if (comma <= 0 || comma >= (int)comp_addr_str.length() - 1 || comp_addr_str.indexOf(',', comma + 1) != -1) {
-                                            result += "Components     | Invalid Blinds group definition.\r\n";
-                                            result += "               | Usage: comp add <name> Blinds@Group:<relay_up>,<relay_down> [enabled]\r\n";
+                                        if (step_ms_str.isEmpty()) {
+                                            result += "Components     | Missing Blinds StepMs parameter.\r\n";
+                                            result += "               | Usage: comp add <name> Blinds@Group:<relay_up>,<relay_down> <StepMs> [OpenAccel] [CloseAccel] [CalibrationMultiplier] [enabled]\r\n";
                                         } else {
-                                            String relay_up_name = comp_addr_str.substring(0, comma);
-                                            String relay_down_name = comp_addr_str.substring(comma + 1);
-                                            relay_up_name.trim();
-                                            relay_down_name.trim();
+                                            bool valid_stepms = true;
+                                            for (size_t i = 0; i < step_ms_str.length(); ++i) {
+                                                if (!isDigit(step_ms_str[i])) {
+                                                    valid_stepms = false;
+                                                    break;
+                                                }
+                                            }
 
-                                            if (relay_up_name.isEmpty() || relay_down_name.isEmpty()) {
-                                                result += "Components     | Invalid Blinds group definition.\r\n";
-                                                result += "               | Usage: comp add <name> Blinds@Group:<relay_up>,<relay_down> [enabled]\r\n";
-                                            } else if (relay_up_name.equalsIgnoreCase(relay_down_name)) {
-                                                result += "Components     | Blinds group contains repeated components.\r\n";
+                                            if (!valid_stepms) {
+                                                result += "Components     | Invalid StepMs '" + step_ms_str + "'.\r\n";
                                             } else {
-                                                Generic* relay_up_generic = nullptr;
-                                                Generic* relay_down_generic = nullptr;
+                                                uint16_t comp_step_ms = (uint16_t)step_ms_str.toInt();
 
-                                                int idx = Settings.Components.IndexOf(relay_up_name);
-                                                if (idx != -1) relay_up_generic = Settings.Components[idx];
+                                                float comp_open_accel = parameter[4].isEmpty() ? 0.0f : parameter[4].toFloat();
+                                                float comp_close_accel = parameter[5].isEmpty() ? 0.0f : parameter[5].toFloat();
+                                                uint8_t comp_calibration_multiplier = parameter[6].isEmpty() ? 3 : (uint8_t)parameter[6].toInt();
+                                                bool comp_enabled = parameter[7].isEmpty() ? true : parameter[7].equalsIgnoreCase("true");
 
-                                                idx = Settings.Components.IndexOf(relay_down_name);
-                                                if (idx != -1) relay_down_generic = Settings.Components[idx];
+                                                int comma = comp_addr_str.indexOf(',');
 
-                                                if (relay_up_generic == nullptr) {
-                                                    result += "Components     | Component '" + relay_up_name + "' not found.\r\n";
-                                                } else if (relay_down_generic == nullptr) {
-                                                    result += "Components     | Component '" + relay_down_name + "' not found.\r\n";
-                                                } else if (relay_up_generic->Class() != CLASS_RELAY) {
-                                                    result += "Components     | Component '" + relay_up_name + "' must be a Relay.\r\n";
-                                                } else if (relay_down_generic->Class() != CLASS_RELAY) {
-                                                    result += "Components     | Component '" + relay_down_name + "' must be a Relay.\r\n";
+                                                if (comma <= 0 || comma >= (int)comp_addr_str.length() - 1 || comp_addr_str.indexOf(',', comma + 1) != -1) {
+                                                    result += "Components     | Invalid Blinds group definition.\r\n";
+                                                    result += "               | Usage: comp add <name> Blinds@Group:<relay_up>,<relay_down> <StepMs> [OpenAccel] [CloseAccel] [CalibrationMultiplier] [enabled]\r\n";
                                                 } else {
-                                                    Relay* relay_up = (Relay*)relay_up_generic;
-                                                    Relay* relay_down = (Relay*)relay_down_generic;
+                                                    String relay_up_name = comp_addr_str.substring(0, comma);
+                                                    String relay_down_name = comp_addr_str.substring(comma + 1);
 
-                                                    bool relay_pair_in_use = false;
-                                                    for (size_t i = 0; i < Settings.Components.Count(); ++i) {
-                                                        Generic* existing = Settings.Components[i];
-                                                        if (existing == nullptr) continue;
-                                                        if (existing->Class() != CLASS_BLINDS) continue;
+                                                    relay_up_name.trim();
+                                                    relay_down_name.trim();
 
-                                                        Blinds* existing_blinds = (Blinds*)existing;
-                                                        if (existing_blinds == nullptr) continue;
-
-                                                        if (existing_blinds->RelayUp() == relay_up &&
-                                                            existing_blinds->RelayDown() == relay_down) {
-                                                            relay_pair_in_use = true;
-                                                            break;
-                                                        }
-                                                    }
-
-                                                    if (relay_pair_in_use) {
-                                                        result += "Components     | A Blinds component with relays '" + relay_up_name + "' and '" + relay_down_name + "' already exists.\r\n";
+                                                    if (relay_up_name.isEmpty() || relay_down_name.isEmpty()) {
+                                                        result += "Components     | Invalid Blinds group definition.\r\n";
+                                                        result += "               | Usage: comp add <name> Blinds@Group:<relay_up>,<relay_down> <StepMs> [OpenAccel] [CloseAccel] [CalibrationMultiplier] [enabled]\r\n";
+                                                    } else if (relay_up_name.equalsIgnoreCase(relay_down_name)) {
+                                                        result += "Components     | Blinds group contains repeated components.\r\n";
                                                     } else {
-                                                        Generic* NewComponent = new Blinds(
-                                                            comp_name,
-                                                            Settings.Components.Count() + 1,
-                                                            relay_up,
-                                                            relay_down
-                                                        );
+                                                        Generic* relay_up_generic = nullptr;
+                                                        Generic* relay_down_generic = nullptr;
 
-                                                        if (Settings.Components.Add(NewComponent)) {
-                                                            NewComponent->Enabled(comp_enabled);
-                                                            changed = true;
+                                                        int idx = Settings.Components.IndexOf(relay_up_name);
+                                                        if (idx != -1) relay_up_generic = Settings.Components[idx];
 
-                                                            result += "Components     | New component '" + comp_name + "' added\r\n";
-                                                            result += "               | Class: " + comp_class + "\r\n";
-                                                            result += "               | Bus: " + comp_bus + "\r\n";
-                                                            result += "               | RelayUp: " + relay_up_name + "\r\n";
-                                                            result += "               | RelayDown: " + relay_down_name + "\r\n";
-                                                            result += "               | Enabled: " + String(comp_enabled ? "true" : "false") + "\r\n";
+                                                        idx = Settings.Components.IndexOf(relay_down_name);
+                                                        if (idx != -1) relay_down_generic = Settings.Components[idx];
+
+                                                        if (relay_up_generic == nullptr) {
+                                                            result += "Components     | Component '" + relay_up_name + "' not found.\r\n";
+                                                        } else if (relay_down_generic == nullptr) {
+                                                            result += "Components     | Component '" + relay_down_name + "' not found.\r\n";
+                                                        } else if (relay_up_generic->Class() != CLASS_RELAY) {
+                                                            result += "Components     | Component '" + relay_up_name + "' must be a Relay.\r\n";
+                                                        } else if (relay_down_generic->Class() != CLASS_RELAY) {
+                                                            result += "Components     | Component '" + relay_down_name + "' must be a Relay.\r\n";
                                                         } else {
-                                                            delete NewComponent;
-                                                            result += "Components     | Error while adding component '" + comp_name + "'.\r\n";
+                                                            Relay* relay_up = (Relay*)relay_up_generic;
+                                                            Relay* relay_down = (Relay*)relay_down_generic;
+
+                                                            bool relay_pair_in_use = false;
+
+                                                            for (size_t i = 0; i < Settings.Components.Count(); ++i) {
+                                                                Generic* existing = Settings.Components[i];
+                                                                if (existing == nullptr) continue;
+                                                                if (existing->Class() != CLASS_BLINDS) continue;
+
+                                                                Blinds* existing_blinds = (Blinds*)existing;
+
+                                                                if (existing_blinds->RelayUp() == relay_up &&
+                                                                    existing_blinds->RelayDown() == relay_down) {
+                                                                    relay_pair_in_use = true;
+                                                                    break;
+                                                                }
+                                                            }
+
+                                                            if (relay_pair_in_use) {
+                                                                result += "Components     | A Blinds component with relays '" + relay_up_name + "' and '" + relay_down_name + "' already exists.\r\n";
+                                                            } else {
+                                                                Blinds* NewComponent = new Blinds(
+                                                                    comp_name,
+                                                                    Settings.Components.Count() + 1,
+                                                                    relay_up,
+                                                                    relay_down
+                                                                );
+
+                                                                NewComponent->StepMs(comp_step_ms);
+                                                                NewComponent->OpenAccel(comp_open_accel);
+                                                                NewComponent->CloseAccel(comp_close_accel);
+                                                                NewComponent->CalibrationMultiplier(comp_calibration_multiplier);
+
+                                                                if (Settings.Components.Add(NewComponent)) {
+                                                                    NewComponent->Enabled(comp_enabled);
+                                                                    changed = true;
+
+                                                                    result += "Components     | New component '" + comp_name + "' added\r\n";
+                                                                    result += "               | Class: " + comp_class + "\r\n";
+                                                                    result += "               | Bus: " + comp_bus + "\r\n";
+                                                                    result += "               | RelayUp: " + relay_up_name + "\r\n";
+                                                                    result += "               | RelayDown: " + relay_down_name + "\r\n";
+                                                                    result += "               | StepMs: " + String(NewComponent->StepMs()) + "\r\n";
+                                                                    result += "               | OpenAccel: " + String(NewComponent->OpenAccel(), 2) + "\r\n";
+                                                                    result += "               | CloseAccel: " + String(NewComponent->CloseAccel(), 2) + "\r\n";
+                                                                    result += "               | CalibrationMultiplier: " + String(NewComponent->CalibrationMultiplier()) + "\r\n";
+                                                                    result += "               | Enabled: " + String(comp_enabled ? "true" : "false") + "\r\n";
+                                                                } else {
+                                                                    delete NewComponent;
+                                                                    result += "Components     | Error while adding component '" + comp_name + "'.\r\n";
+                                                                }
+                                                            }
                                                         }
                                                     }
                                                 }
